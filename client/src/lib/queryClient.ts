@@ -1,9 +1,11 @@
 import { QueryClient, QueryFunction } from "@tanstack/react-query";
 
-// deploy_website replaces __PORT_5000__ with /port/5000 in the built JS.
-// At dev time the literal string is untouched, so we detect it and use "".
-const _RAW_PORT = "__PORT_5000__";
-const API_BASE = _RAW_PORT.includes("PORT_5000") ? "" : _RAW_PORT;
+// Runtime API base detection — works in both dev and deployed environments.
+// In dev (localhost/127.0.0.1) we use "" (relative), because Vite proxies /api to Express.
+// In the Perplexity sandbox (perplexity.ai / pplx.app) the backend is reachable at /port/5000.
+const _hostname = typeof window !== "undefined" ? window.location.hostname : "localhost";
+const _isLocalhost = _hostname === "localhost" || _hostname === "127.0.0.1";
+const API_BASE = _isLocalhost ? "" : "/port/5000";
 
 // ─── Token store ─────────────────────────────────────────────────────────────
 // In-memory only — localStorage/cookies are blocked in the sandboxed iframe.
