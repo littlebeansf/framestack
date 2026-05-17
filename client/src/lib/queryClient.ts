@@ -1,6 +1,9 @@
 import { QueryClient, QueryFunction } from "@tanstack/react-query";
 
-const API_BASE = "__PORT_5000__".startsWith("__") ? "" : "__PORT_5000__";
+// deploy_website replaces __PORT_5000__ with /port/5000 in the built JS.
+// At dev time the literal string is untouched, so we detect it and use "".
+const _RAW_PORT = "__PORT_5000__";
+const API_BASE = _RAW_PORT.includes("PORT_5000") ? "" : _RAW_PORT;
 
 // ─── Token store ─────────────────────────────────────────────────────────────
 // In-memory only — localStorage/cookies are blocked in the sandboxed iframe.
