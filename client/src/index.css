@@ -1,0 +1,169 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ─── Fonts ──────────────────────────────────────────────────────────────── */
+/* Cabinet Grotesk (headings) + Satoshi (body) from Fontshare */
+
+@layer base {
+  :root {
+    /* Framestack — cinematic dark palette
+       Dark navy/charcoal surfaces + violet-indigo accent
+       Inspired by: film posters, AniList, letterboxd */
+
+    /* Surfaces */
+    --background: 230 15% 7%;
+    --foreground: 220 12% 88%;
+
+    --card: 230 14% 9%;
+    --card-foreground: 220 12% 88%;
+
+    --popover: 230 14% 11%;
+    --popover-foreground: 220 12% 88%;
+
+    /* Accent: violet-indigo */
+    --primary: 255 70% 65%;
+    --primary-foreground: 255 15% 8%;
+
+    --secondary: 230 12% 14%;
+    --secondary-foreground: 220 12% 75%;
+
+    --muted: 230 12% 14%;
+    --muted-foreground: 220 8% 55%;
+
+    --accent: 255 50% 20%;
+    --accent-foreground: 255 70% 80%;
+
+    --destructive: 0 65% 55%;
+    --destructive-foreground: 0 0% 98%;
+
+    --border: 230 10% 16%;
+    --input: 230 10% 14%;
+    --ring: 255 70% 65%;
+
+    --radius: 0.5rem;
+
+    /* Sidebar */
+    --sidebar-background: 230 15% 6%;
+    --sidebar-foreground: 220 10% 70%;
+    --sidebar-primary: 255 70% 65%;
+    --sidebar-primary-foreground: 255 15% 8%;
+    --sidebar-accent: 230 12% 12%;
+    --sidebar-accent-foreground: 220 12% 85%;
+    --sidebar-border: 230 10% 13%;
+    --sidebar-ring: 255 70% 65%;
+
+    /* Chart colors */
+    --chart-1: 255 70% 65%;
+    --chart-2: 190 65% 55%;
+    --chart-3: 160 55% 50%;
+    --chart-4: 30 80% 60%;
+    --chart-5: 340 65% 60%;
+  }
+
+  .light {
+    --background: 220 18% 96%;
+    --foreground: 230 20% 12%;
+
+    --card: 220 15% 99%;
+    --card-foreground: 230 20% 12%;
+
+    --popover: 220 15% 99%;
+    --popover-foreground: 230 20% 12%;
+
+    --primary: 255 65% 52%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 220 12% 92%;
+    --secondary-foreground: 230 15% 30%;
+
+    --muted: 220 12% 93%;
+    --muted-foreground: 220 8% 50%;
+
+    --accent: 255 55% 92%;
+    --accent-foreground: 255 65% 35%;
+
+    --destructive: 0 65% 50%;
+    --destructive-foreground: 0 0% 98%;
+
+    --border: 220 10% 86%;
+    --input: 220 10% 90%;
+    --ring: 255 65% 52%;
+
+    --sidebar-background: 220 20% 97%;
+    --sidebar-foreground: 220 15% 35%;
+    --sidebar-primary: 255 65% 52%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 220 15% 92%;
+    --sidebar-accent-foreground: 220 20% 20%;
+    --sidebar-border: 220 12% 88%;
+    --sidebar-ring: 255 65% 52%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+    box-sizing: border-box;
+  }
+
+  html {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+    scroll-behavior: smooth;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+    min-height: 100dvh;
+    font-family: 'Satoshi', 'Inter', system-ui, sans-serif;
+    font-size: 1rem;
+    line-height: 1.6;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    font-family: 'Cabinet Grotesk', 'Satoshi', system-ui, sans-serif;
+    font-weight: 700;
+    line-height: 1.2;
+    text-wrap: balance;
+  }
+}
+
+/* ─── Skeleton shimmer ────────────────────────────────────────────────────── */
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+.skeleton {
+  background: linear-gradient(90deg,
+    hsl(var(--muted)) 25%,
+    hsl(var(--secondary)) 50%,
+    hsl(var(--muted)) 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s ease-in-out infinite;
+  border-radius: 0.375rem;
+}
+
+/* ─── Cover image aspect ratio ────────────────────────────────────────────── */
+.cover-img {
+  aspect-ratio: 2/3;
+  object-fit: cover;
+  width: 100%;
+  height: 100%;
+}
+
+/* ─── Media type color badges ─────────────────────────────────────────────── */
+.badge-anime   { background: hsl(255 70% 25%); color: hsl(255 80% 80%); }
+.badge-manga   { background: hsl(340 60% 22%); color: hsl(340 75% 80%); }
+.badge-movie   { background: hsl(30 70% 22%);  color: hsl(30 85% 75%); }
+.badge-series  { background: hsl(190 60% 20%); color: hsl(190 75% 75%); }
+.badge-book    { background: hsl(160 50% 20%); color: hsl(160 70% 72%); }
+
+/* ─── Status dot colors ───────────────────────────────────────────────────── */
+.status-watching  { color: hsl(190 75% 55%); }
+.status-reading   { color: hsl(255 75% 70%); }
+.status-completed { color: hsl(160 65% 50%); }
+.status-on_hold   { color: hsl(30 85% 65%); }
+.status-dropped   { color: hsl(0 65% 60%); }
+.status-wishlist  { color: hsl(220 8% 55%); }

@@ -1,0 +1,233 @@
+import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { apiRequest } from "@/lib/queryClient";
+import type { Item } from "@shared/schema";
+import { MEDIA_TYPES, STATUSES } from "@shared/schema";
+import ItemCard from "@/components/ItemCard";
+import { cn } from "@/lib/utils";
+import { Search, BookOpen, Library, SlidersHorizontal } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Button } from "@/components/ui/button";
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from "@/components/ui/sheet";
+
+const TYPE_LABELS: Record<string, string> = {
+  anime: "Anime", manga: "Manga", movie: "Movie", series: "Series", book: "Book",
+};
+const STATUS_LABELS: Record<string, string> = {
+  watching: "Watching", reading: "Reading", completed: "Completed",
+  on_hold: "On Hold", dropped: "Dropped", wishlist: "Wishlist",
+};
+
+const STATUS_DOTS: Record<string, string> = {
+  watching: "bg-[hsl(190,75%,55%)]",
+  reading: "bg-[hsl(255,75%,70%)]",
+  completed: "bg-[hsl(160,65%,50%)]",
+  on_hold: "bg-[hsl(30,85%,65%)]",
+  dropped: "bg-[hsl(0,65%,60%)]",
+  wishlist: "bg-[hsl(220,8%,55%)]",
+};
+
+function SkeletonCard() {
+  return (
+    <div className="rounded-lg overflow-hidden bg-card border border-border">
+      <div className="aspect-[2/3] skeleton" />
+      <div className="p-2.5 space-y-1.5">
+        <div className="h-3 skeleton rounded w-full" />
+        <div className="h-3 skeleton rounded w-2/3" />
+      </div>
+    </div>
+  );
+}
+
+export default function LibraryPage() {
+  const [search, setSearch] = useState("");
+  const [typeFilter, setTypeFilter] = useState<string>("all");
+  const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [sortBy, setSortBy] = useState<string>("title");
+
+  const { data: items, isLoading } = useQuery<Item[]>({
+    queryKey: ["/api/items"],
+    queryFn: () => apiRequest("GET", "/api/items").then(r => r.json()),
+  });
+
+  const filtered = (items || []).filter(item => {
+    if (typeFilter !== "all" && item.mediaType !== typeFilter) return false;
+    if (statusFilter !== "all" && item.status !== statusFilter) return false;
+    if (search && !item.title.toLowerCase().includes(search.toLowerCase())) return false;
+    return true;
+  }).sort((a, b) => {
+    if (sortBy === "title") return a.title.localeCompare(b.title);
+    if (sortBy === "rating") return (b.rating ?? 0) - (a.rating ?? 0);
+    if (sortBy === "year") return (b.year ?? "0").localeCompare(a.year ?? "0");
+    return 0;
+  });
+
+  // Stats
+  const stats = STATUSES.reduce((acc, s) => {
+    acc[s] = (items || []).filter(i => i.status === s).length;
+    return acc;
+  }, {} as Record<string, number>);
+
+  const filters = (
+    <div className="space-y-4">
+      <div>
+        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">Type</p>
+        <div className="space-y-1">
+          <button
+            onClick={() => setTypeFilter("all")}
+            className={cn("w-full text-left text-sm px-2 py-1.5 rounded transition-colors",
+              typeFilter === "all" ? "bg-accent text-accent-foreground font-medium" : "text-muted-foreground hover:text-foreground hover:bg-secondary"
+            )}
+          >
+            All types
+          </button>
+          {MEDIA_TYPES.map(t => (
+            <button
+              key={t}
+              onClick={() => setTypeFilter(t)}
+              className={cn("w-full text-left text-sm px-2 py-1.5 rounded transition-colors flex items-center gap-2",
+                typeFilter === t ? "bg-accent text-accent-foreground font-medium" : "text-muted-foreground hover:text-foreground hover:bg-secondary"
+              )}
+            >
+              <span className={cn("inline-block w-2 h-2 rounded-sm", `badge-${t}`)} />
+              {TYPE_LABELS[t]}
+              <span className="ml-auto text-xs opacity-60">{(items || []).filter(i => i.mediaType === t).length}</span>
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div>
+        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">Status</p>
+        <div className="space-y-1">
+          <button
+            onClick={() => setStatusFilter("all")}
+            className={cn("w-full text-left text-sm px-2 py-1.5 rounded transition-colors",
+              statusFilter === "all" ? "bg-accent text-accent-foreground font-medium" : "text-muted-foreground hover:text-foreground hover:bg-secondary"
+            )}
+          >
+            All statuses
+          </button>
+          {STATUSES.map(s => (
+            <button
+              key={s}
+              onClick={() => setStatusFilter(s)}
+              className={cn("w-full text-left text-sm px-2 py-1.5 rounded transition-colors flex items-center gap-2",
+                statusFilter === s ? "bg-accent text-accent-foreground font-medium" : "text-muted-foreground hover:text-foreground hover:bg-secondary"
+              )}
+            >
+              <span className={cn("inline-block w-2 h-2 rounded-full", STATUS_DOTS[s])} />
+              {STATUS_LABELS[s]}
+              <span className="ml-auto text-xs opacity-60">{stats[s] || 0}</span>
+            </button>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+
+  return (
+    <div className="flex gap-6 h-full">
+      {/* Desktop sidebar filters */}
+      <aside className="hidden lg:block w-44 shrink-0">
+        <div className="sticky top-0">
+          <h2 className="font-semibold text-sm text-foreground mb-4 flex items-center gap-2">
+            <Library size={15} />
+            My Library
+          </h2>
+          {filters}
+        </div>
+      </aside>
+
+      {/* Main content */}
+      <div className="flex-1 min-w-0">
+        {/* Header row */}
+        <div className="flex items-center gap-3 mb-5 flex-wrap">
+          <div className="relative flex-1 min-w-48">
+            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
+            <Input
+              className="pl-8 h-9 text-sm"
+              placeholder="Filter by title…"
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              data-testid="input-library-search"
+            />
+          </div>
+
+          <Select value={sortBy} onValueChange={setSortBy}>
+            <SelectTrigger className="w-36 h-9 text-sm" data-testid="select-sort">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="title">Sort: Title</SelectItem>
+              <SelectItem value="rating">Sort: Rating</SelectItem>
+              <SelectItem value="year">Sort: Year</SelectItem>
+            </SelectContent>
+          </Select>
+
+          {/* Mobile filters sheet */}
+          <Sheet>
+            <SheetTrigger asChild>
+              <Button variant="outline" size="sm" className="lg:hidden h-9 gap-2">
+                <SlidersHorizontal size={14} />
+                Filter
+              </Button>
+            </SheetTrigger>
+            <SheetContent side="left" className="w-60">
+              <SheetHeader>
+                <SheetTitle>Filters</SheetTitle>
+              </SheetHeader>
+              <div className="mt-4">{filters}</div>
+            </SheetContent>
+          </Sheet>
+        </div>
+
+        {/* Count */}
+        <p className="text-xs text-muted-foreground mb-4">
+          {isLoading ? "Loading…" : `${filtered.length} item${filtered.length !== 1 ? "s" : ""}`}
+          {(typeFilter !== "all" || statusFilter !== "all" || search) && (items || []).length > 0
+            ? ` of ${(items || []).length} total`
+            : ""}
+        </p>
+
+        {/* Grid */}
+        {isLoading ? (
+          <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3">
+            {Array.from({ length: 12 }).map((_, i) => <SkeletonCard key={i} />)}
+          </div>
+        ) : filtered.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-20 text-center text-muted-foreground">
+            <BookOpen size={40} className="mb-4 opacity-20" />
+            <p className="font-medium text-foreground text-sm">
+              {(items || []).length === 0 ? "Your library is empty" : "No items match your filters"}
+            </p>
+            <p className="text-xs mt-1 max-w-xs">
+              {(items || []).length === 0
+                ? "Use the search bar in the sidebar to find and add anime, manga, movies, series, and books."
+                : "Try changing or clearing your filters."}
+            </p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3">
+            {filtered.map(item => (
+              <ItemCard key={item.id} item={item} />
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
