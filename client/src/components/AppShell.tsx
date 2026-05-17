@@ -1,22 +1,7 @@
 import { useState } from "react";
 import { Link, useLocation } from "wouter";
-import { useQueryClient, useMutation } from "@tanstack/react-query";
-import { apiRequest, setAuthToken } from "@/lib/queryClient";
-import { useAuth } from "@/contexts/AuthContext";
 import { cn } from "@/lib/utils";
-import {
-  Library, FolderOpen, User, Search, LogOut,
-  Menu, X, Sun, Moon, BookOpen, Film, Tv, BookMarked, Star
-} from "lucide-react";
-import { Button } from "@/components/ui/button";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Library, FolderOpen, User, Search, Menu, Sun, Moon } from "lucide-react";
 import SearchDialog from "@/components/SearchDialog";
 
 const NAV_ITEMS = [
@@ -40,29 +25,11 @@ function Logo() {
   );
 }
 
-export default function AppShell({ user, children }: { user: any; children: React.ReactNode }) {
+export default function AppShell({ children }: { children: React.ReactNode }) {
   const [location] = useLocation();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const [darkMode, setDarkMode] = useState(() => !document.documentElement.classList.contains("light"));
-  const qc = useQueryClient();
-
-  const { logout } = useAuth();
-
-  const logoutMutation = useMutation({
-    mutationFn: () => apiRequest("POST", "/api/auth/logout").then(r => r.json()),
-    onSuccess: () => {
-      setAuthToken(null);
-      qc.clear();
-      logout();
-    },
-    onError: () => {
-      // Even if the server call fails, clear the local session
-      setAuthToken(null);
-      qc.clear();
-      logout();
-    },
-  });
 
   function toggleTheme() {
     const next = !darkMode;
@@ -73,9 +40,6 @@ export default function AppShell({ user, children }: { user: any; children: Reac
       document.documentElement.classList.add("light");
     }
   }
-
-  const initials = (user.displayName || user.username || "?")
-    .split(" ").map((w: string) => w[0]).join("").toUpperCase().slice(0, 2);
 
   const sidebar = (
     <nav className="flex flex-col h-full">
@@ -121,8 +85,8 @@ export default function AppShell({ user, children }: { user: any; children: Reac
         })}
       </ul>
 
-      {/* Bottom: theme + user */}
-      <div className="px-3 pb-4 space-y-1 border-t border-border pt-3">
+      {/* Bottom: theme toggle */}
+      <div className="px-3 pb-4 border-t border-border pt-3">
         <button
           onClick={toggleTheme}
           data-testid="button-theme-toggle"
@@ -131,38 +95,6 @@ export default function AppShell({ user, children }: { user: any; children: Reac
           {darkMode ? <Sun size={16} /> : <Moon size={16} />}
           {darkMode ? "Light mode" : "Dark mode"}
         </button>
-
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <button
-              data-testid="button-user-menu"
-              className="w-full flex items-center gap-3 px-3 py-2 rounded-md text-sm hover:bg-secondary transition-colors"
-            >
-              <Avatar className="h-7 w-7 shrink-0">
-                <AvatarImage src={user.avatarUrl || undefined} />
-                <AvatarFallback className="text-xs bg-primary/20 text-primary">{initials}</AvatarFallback>
-              </Avatar>
-              <div className="flex-1 text-left overflow-hidden">
-                <p className="text-foreground font-medium truncate leading-tight text-sm">{user.displayName || user.username}</p>
-                <p className="text-muted-foreground truncate text-xs">@{user.username}</p>
-              </div>
-            </button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-48">
-            <DropdownMenuItem asChild>
-              <Link href="/profile">Profile settings</Link>
-            </DropdownMenuItem>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem
-              className="text-destructive focus:text-destructive"
-              onClick={() => logoutMutation.mutate()}
-              data-testid="button-logout"
-            >
-              <LogOut size={14} className="mr-2" />
-              Sign out
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
       </div>
     </nav>
   );

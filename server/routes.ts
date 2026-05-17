@@ -1,131 +1,42 @@
 import type { Express } from "express";
 import { Server } from "http";
-import bcrypt from "bcrypt";
-import { signToken, requireAuth } from "./auth";
 import { storage } from "./storage";
 import fetch from "node-fetch";
 
+// Single-user mode — no auth. All data belongs to userId 1.
+const USER_ID = 1;
+
 export async function registerRoutes(httpServer: Server, app: Express) {
-  // ─── Auth ──────────────────────────────────────────────────────────────────
-
-  app.post("/api/auth/register", async (req, res) => {
-    try {
-      const { username, email, password, displayName } = req.body;
-      if (!username || !email || !password) {
-        return res.status(400).json({ error: "Missing required fields" });
-      }
-      if (storage.getUserByUsername(username)) {
-        return res.status(400).json({ error: "Username already taken" });
-      }
-      if (storage.getUserByEmail(email)) {
-        return res.status(400).json({ error: "Email already in use" });
-      }
-      const hashed = await bcrypt.hash(password, 10);
-      const user = storage.createUser({
-        username,
-        email,
-        password: hashed,
-        displayName: displayName || username,
-      });
-      const token = signToken(user.id);
-      const { password: _, ...safe } = user;
-      res.json({ token, user: safe });
-    } catch (err: any) {
-      res.status(500).json({ error: err.message });
-    }
-  });
-
-  app.post("/api/auth/login", async (req, res) => {
-    try {
-      const { username, password } = req.body;
-      if (!username || !password) {
-        return res.status(400).json({ error: "Missing username or password" });
-      }
-      const user = storage.getUserByUsername(username);
-      if (!user) {
-        return res.status(401).json({ error: "Invalid username or password" });
-      }
-      const valid = await bcrypt.compare(password, user.password);
-      if (!valid) {
-        return res.status(401).json({ error: "Invalid username or password" });
-      }
-      const token = signToken(user.id);
-      const { password: _, ...safe } = user;
-      res.json({ token, user: safe });
-    } catch (err: any) {
-      res.status(500).json({ error: err.message });
-    }
-  });
-
-  app.post("/api/auth/logout", (_req, res) => {
-    // JWT is stateless — client just drops the token
-    res.json({ ok: true });
-  });
-
-  // Used by the auth context to rehydrate on mount if a token were stored.
-  // Since we do NOT store the token (iframe sandbox), this just validates the
-  // bearer token and returns the user — useful for the initial auth check.
-  app.get("/api/auth/me", requireAuth, (req, res) => {
-    const userId = (req as any).userId;
-    const user = storage.getUserById(userId);
-    if (!user) return res.status(401).json({ error: "User not found" });
-    const { password: _, ...safe } = user;
-    res.json(safe);
-  });
-
-  app.patch("/api/auth/profile", requireAuth, async (req, res) => {
-    try {
-      const userId = (req as any).userId;
-      const { displayName, avatarUrl, email } = req.body;
-      const updated = storage.updateUser(userId, { displayName, avatarUrl, email });
-      if (!updated) return res.status(404).json({ error: "User not found" });
-      const { password: _, ...safe } = updated;
-      res.json(safe);
-    } catch (err: any) {
-      res.status(500).json({ error: err.message });
-    }
-  });
-
-  app.post("/api/auth/change-password", requireAuth, async (req, res) => {
-    try {
-      const userId = (req as any).userId;
-      const { currentPassword, newPassword } = req.body;
-      const user = storage.getUserById(userId);
-      if (!user) return res.status(404).json({ error: "User not found" });
-      const valid = await bcrypt.compare(currentPassword, user.password);
-      if (!valid) return res.status(400).json({ error: "Current password is incorrect" });
-      const hashed = await bcrypt.hash(newPassword, 10);
-      storage.updateUser(userId, { password: hashed });
-      res.json({ ok: true });
-    } catch (err: any) {
-      res.status(500).json({ error: err.message });
-    }
-  });
+  // Ensure the single user exists on startup
+  if (!storage.getUserById(USER_ID)) {
+    storage.createUser({
+      username: "me",
+      email: "me@framestack.local",
+      password: "",
+      displayName: "Me",
+    });
+  }
 
   // ─── Items ─────────────────────────────────────────────────────────────────
 
-  app.get("/api/items", requireAuth, (req, res) => {
-    const userId = (req as any).userId;
-    const items = storage.getItemsByUser(userId);
-    res.json(items);
+  app.get("/api/items", (req, res) => {
+    res.json(storage.getItemsByUser(USER_ID));
   });
 
-  app.post("/api/items", requireAuth, (req, res) => {
+  app.post("/api/items", (req, res) => {
     try {
-      const userId = (req as any).userId;
-      const item = storage.createItem({ ...req.body, userId });
+      const item = storage.createItem({ ...req.body, userId: USER_ID });
       res.json(item);
     } catch (err: any) {
       res.status(500).json({ error: err.message });
     }
   });
 
-  app.patch("/api/items/:id", requireAuth, (req, res) => {
+  app.patch("/api/items/:id", (req, res) => {
     try {
       const id = parseInt(req.params.id);
       const item = storage.getItemById(id);
       if (!item) return res.status(404).json({ error: "Item not found" });
-      if (item.userId !== (req as any).userId) return res.status(403).json({ error: "Forbidden" });
       const updated = storage.updateItem(id, req.body);
       res.json(updated);
     } catch (err: any) {
@@ -133,12 +44,11 @@ export async function registerRoutes(httpServer: Server, app: Express) {
     }
   });
 
-  app.delete("/api/items/:id", requireAuth, (req, res) => {
+  app.delete("/api/items/:id", (req, res) => {
     try {
       const id = parseInt(req.params.id);
       const item = storage.getItemById(id);
       if (!item) return res.status(404).json({ error: "Item not found" });
-      if (item.userId !== (req as any).userId) return res.status(403).json({ error: "Forbidden" });
       storage.deleteItem(id);
       res.json({ ok: true });
     } catch (err: any) {
@@ -146,34 +56,31 @@ export async function registerRoutes(httpServer: Server, app: Express) {
     }
   });
 
-  app.get("/api/items/:id/collections", requireAuth, (req, res) => {
+  app.get("/api/items/:id/collections", (req, res) => {
     const id = parseInt(req.params.id);
     res.json(storage.getCollectionsForItem(id));
   });
 
   // ─── Collections ───────────────────────────────────────────────────────────
 
-  app.get("/api/collections", requireAuth, (req, res) => {
-    const userId = (req as any).userId;
-    res.json(storage.getCollectionsByUser(userId));
+  app.get("/api/collections", (req, res) => {
+    res.json(storage.getCollectionsByUser(USER_ID));
   });
 
-  app.post("/api/collections", requireAuth, (req, res) => {
+  app.post("/api/collections", (req, res) => {
     try {
-      const userId = (req as any).userId;
-      const col = storage.createCollection({ ...req.body, userId });
+      const col = storage.createCollection({ ...req.body, userId: USER_ID });
       res.json(col);
     } catch (err: any) {
       res.status(500).json({ error: err.message });
     }
   });
 
-  app.patch("/api/collections/:id", requireAuth, (req, res) => {
+  app.patch("/api/collections/:id", (req, res) => {
     try {
       const id = parseInt(req.params.id);
       const col = storage.getCollectionById(id);
       if (!col) return res.status(404).json({ error: "Collection not found" });
-      if (col.userId !== (req as any).userId) return res.status(403).json({ error: "Forbidden" });
       const updated = storage.updateCollection(id, req.body);
       res.json(updated);
     } catch (err: any) {
@@ -181,12 +88,11 @@ export async function registerRoutes(httpServer: Server, app: Express) {
     }
   });
 
-  app.delete("/api/collections/:id", requireAuth, (req, res) => {
+  app.delete("/api/collections/:id", (req, res) => {
     try {
       const id = parseInt(req.params.id);
       const col = storage.getCollectionById(id);
       if (!col) return res.status(404).json({ error: "Collection not found" });
-      if (col.userId !== (req as any).userId) return res.status(403).json({ error: "Forbidden" });
       storage.deleteCollection(id);
       res.json({ ok: true });
     } catch (err: any) {
@@ -194,12 +100,12 @@ export async function registerRoutes(httpServer: Server, app: Express) {
     }
   });
 
-  app.get("/api/collections/:id/items", requireAuth, (req, res) => {
+  app.get("/api/collections/:id/items", (req, res) => {
     const id = parseInt(req.params.id);
     res.json(storage.getItemsInCollection(id));
   });
 
-  app.post("/api/collections/:id/items", requireAuth, (req, res) => {
+  app.post("/api/collections/:id/items", (req, res) => {
     try {
       const collectionId = parseInt(req.params.id);
       const { itemId } = req.body;
@@ -210,7 +116,7 @@ export async function registerRoutes(httpServer: Server, app: Express) {
     }
   });
 
-  app.delete("/api/collections/:id/items/:itemId", requireAuth, (req, res) => {
+  app.delete("/api/collections/:id/items/:itemId", (req, res) => {
     try {
       const collectionId = parseInt(req.params.id);
       const itemId = parseInt(req.params.itemId);
@@ -223,8 +129,7 @@ export async function registerRoutes(httpServer: Server, app: Express) {
 
   // ─── External Search ───────────────────────────────────────────────────────
 
-  // Proxy to Jikan (anime/manga) — no API key needed
-  app.get("/api/search/anime", requireAuth, async (req, res) => {
+  app.get("/api/search/anime", async (req, res) => {
     try {
       const { q } = req.query;
       const url = `https://api.jikan.moe/v4/anime?q=${encodeURIComponent(String(q))}&limit=10`;
@@ -247,7 +152,7 @@ export async function registerRoutes(httpServer: Server, app: Express) {
     }
   });
 
-  app.get("/api/search/manga", requireAuth, async (req, res) => {
+  app.get("/api/search/manga", async (req, res) => {
     try {
       const { q } = req.query;
       const url = `https://api.jikan.moe/v4/manga?q=${encodeURIComponent(String(q))}&limit=10`;
@@ -269,8 +174,7 @@ export async function registerRoutes(httpServer: Server, app: Express) {
     }
   });
 
-  // OMDb proxy (movies + series) — uses free API key
-  app.get("/api/search/omdb", requireAuth, async (req, res) => {
+  app.get("/api/search/omdb", async (req, res) => {
     try {
       const { q, type } = req.query;
       const apiKey = "2b7a22dd";
@@ -292,8 +196,7 @@ export async function registerRoutes(httpServer: Server, app: Express) {
     }
   });
 
-  // Open Library proxy (books)
-  app.get("/api/search/books", requireAuth, async (req, res) => {
+  app.get("/api/search/books", async (req, res) => {
     try {
       const { q } = req.query;
       const url = `https://openlibrary.org/search.json?q=${encodeURIComponent(String(q))}&limit=10&fields=key,title,author_name,first_publish_year,cover_i,subject`;
@@ -315,8 +218,8 @@ export async function registerRoutes(httpServer: Server, app: Express) {
     }
   });
 
-  // ─── Unified search (all types) ────────────────────────────────────────────
-  app.get("/api/search", requireAuth, async (req, res) => {
+  // ─── Unified search ────────────────────────────────────────────────────────
+  app.get("/api/search", async (req, res) => {
     try {
       const { q, type } = req.query;
       if (!q) return res.json([]);

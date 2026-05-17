@@ -3,36 +3,13 @@ import { useHashLocation } from "wouter/use-hash-location";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { queryClient } from "@/lib/queryClient";
 import { Toaster } from "@/components/ui/toaster";
-import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 
-import AuthPage from "@/pages/auth";
 import LibraryPage from "@/pages/library";
 import CollectionsPage from "@/pages/collections";
 import CollectionDetailPage from "@/pages/collection-detail";
 import ProfilePage from "@/pages/profile";
 import NotFound from "@/pages/not-found";
 import AppShell from "@/components/AppShell";
-
-function AppRouter() {
-  const { user } = useAuth();
-
-  if (!user) {
-    return <AuthPage />;
-  }
-
-  return (
-    <AppShell user={user}>
-      <Switch>
-        <Route path="/" component={LibraryPage} />
-        <Route path="/library" component={LibraryPage} />
-        <Route path="/collections" component={CollectionsPage} />
-        <Route path="/collections/:id" component={CollectionDetailPage} />
-        <Route path="/profile" component={ProfilePage} />
-        <Route component={NotFound} />
-      </Switch>
-    </AppShell>
-  );
-}
 
 export function LogoIcon({ size = 24 }: { size?: number }) {
   return (
@@ -47,12 +24,19 @@ export function LogoIcon({ size = 24 }: { size?: number }) {
 export default function App() {
   return (
     <QueryClientProvider client={queryClient}>
-      <AuthProvider>
-        <Router hook={useHashLocation}>
-          <AppRouter />
-        </Router>
-        <Toaster />
-      </AuthProvider>
+      <Router hook={useHashLocation}>
+        <AppShell>
+          <Switch>
+            <Route path="/" component={LibraryPage} />
+            <Route path="/library" component={LibraryPage} />
+            <Route path="/collections" component={CollectionsPage} />
+            <Route path="/collections/:id" component={CollectionDetailPage} />
+            <Route path="/profile" component={ProfilePage} />
+            <Route component={NotFound} />
+          </Switch>
+        </AppShell>
+      </Router>
+      <Toaster />
     </QueryClientProvider>
   );
 }
