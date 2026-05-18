@@ -26,23 +26,36 @@ export default function CollectionDetailPage() {
   const { toast } = useToast();
   const qc = useQueryClient();
 
-  const { data: collection } = useQuery<Collection>({
-    queryKey: ["/api/collections", id],
-    queryFn: () => apiRequest("GET", `/api/collections`).then(r => r.json()).then((cols: Collection[]) => cols.find(c => c.id === id)),
-    enabled: !!id,
+  // Derive collection from cached list — no extra fetch needed
+  const { data: allCollections } = useQuery<Collection[]>({
+    queryKey: ["/api/collections"],
   });
+  const collection = (allCollections || []).find(c => c.id === id);
 
   const { data: items, isLoading } = useQuery<Item[]>({
     queryKey: ["/api/collections", id, "items"],
-    queryFn: () => apiRequest("GET", `/api/collections/${id}/items`).then(r => r.json()),
+    queryFn: async () => {
+      try {
+        const res = await apiRequest("GET", `/api/collections/${id}/items`);
+        return await res.json();
+      } catch {
+        return [];
+      }
+    },
     enabled: !!id,
   });
 
   const removeMutation = useMutation({
-    mutationFn: (itemId: number) =>
-      apiRequest("DELETE", `/api/collections/${id}/items/${itemId}`).then(r => r.json()),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["/api/collections", id, "items"] });
+    mutationFn: async (itemId: number) => {
+      try {
+        await apiRequest("DELETE", `/api/collections/${id}/items/${itemId}`);
+      } catch { /* offline — just update cache */ }
+      return itemId;
+    },
+    onSuccess: (itemId: number) => {
+      qc.setQueryData<any[]>(["/api/collections", id, "items"], (old = []) =>
+        old.filter(i => i.id !== itemId)
+      );
       toast({ title: "Removed from collection" });
     },
   });

@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
+import { localStore } from "@/lib/localStore";
 import type { Collection } from "@shared/schema";
 import { useLocation } from "wouter";
 import { useToast } from "@/hooks/use-toast";
@@ -48,14 +49,30 @@ function CreateEditDialog({
   const qc = useQueryClient();
 
   const mutation = useMutation({
-    mutationFn: () => {
-      if (existing) {
-        return apiRequest("PATCH", `/api/collections/${existing.id}`, form).then(r => r.json());
+    mutationFn: async () => {
+      try {
+        if (existing) {
+          const res = await apiRequest("PATCH", `/api/collections/${existing.id}`, form);
+          return await res.json();
+        }
+        const res = await apiRequest("POST", "/api/collections", form);
+        return await res.json();
+      } catch {
+        // backend offline — use local store
+        if (existing) {
+          return localStore.updateCollection(existing.id, form) ?? { ...existing, ...form };
+        }
+        return localStore.addCollection({ ...form, userId: 1, description: form.description || null });
       }
-      return apiRequest("POST", "/api/collections", form).then(r => r.json());
     },
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["/api/collections"] });
+    onSuccess: (result: any) => {
+      if (existing) {
+        qc.setQueryData<any[]>(["/api/collections"], (old = []) =>
+          old.map(c => c.id === existing.id ? { ...c, ...result } : c)
+        );
+      } else {
+        qc.setQueryData<any[]>(["/api/collections"], (old = []) => [...old, result]);
+      }
       toast({ title: existing ? "Collection updated" : "Collection created" });
       onOpenChange(false);
     },
@@ -121,13 +138,19 @@ export default function CollectionsPage() {
 
   const { data: collections, isLoading } = useQuery<Collection[]>({
     queryKey: ["/api/collections"],
-    queryFn: () => apiRequest("GET", "/api/collections").then(r => r.json()),
   });
 
   const deleteMutation = useMutation({
-    mutationFn: (id: number) => apiRequest("DELETE", `/api/collections/${id}`).then(r => r.json()),
-    onSuccess: (_, id) => {
-      qc.invalidateQueries({ queryKey: ["/api/collections"] });
+    mutationFn: async (id: number) => {
+      try {
+        await apiRequest("DELETE", `/api/collections/${id}`);
+      } catch {
+        localStore.deleteCollection(id);
+      }
+      return id;
+    },
+    onSuccess: (id: number) => {
+      qc.setQueryData<any[]>(["/api/collections"], (old = []) => old.filter(c => c.id !== id));
       toast({ title: "Collection deleted" });
     },
   });
