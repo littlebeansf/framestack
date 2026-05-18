@@ -1,11 +1,30 @@
 import { QueryClient, QueryFunction } from "@tanstack/react-query";
+import { localStore } from "./localStore";
 
-// Runtime API base detection — works in both dev and deployed environments.
-// In dev (localhost/127.0.0.1) Vite proxies /api to Express, so we use "".
-// On Perplexity the backend is reachable via /port/5000.
+// Runtime API base detection.
+// localhost/127.0.0.1 → Vite dev server proxies /api → Express.
+// Any other host (Perplexity sandbox, GitHub Pages, etc.) → /port/5000 proxy.
 const _hostname = typeof window !== "undefined" ? window.location.hostname : "localhost";
 const _isLocalhost = _hostname === "localhost" || _hostname === "127.0.0.1";
-const API_BASE = _isLocalhost ? "" : "/port/5000";
+export const API_BASE = _isLocalhost ? "" : "/port/5000";
+
+// ─── Backend availability ─────────────────────────────────────────────────────
+// We ping once on load. If unreachable, all mutations fall back to localStore.
+let _backendAvailable: boolean | null = null;
+
+export async function checkBackend(): Promise<boolean> {
+  if (_backendAvailable !== null) return _backendAvailable;
+  try {
+    const r = await fetch(`${API_BASE}/api/items`, { signal: AbortSignal.timeout(3000) });
+    _backendAvailable = r.ok || r.status < 500;
+  } catch {
+    _backendAvailable = false;
+  }
+  return _backendAvailable;
+}
+
+export function isBackendAvailable() { return _backendAvailable; }
+export function setBackendAvailable(v: boolean) { _backendAvailable = v; }
 
 // ─── Error helper ─────────────────────────────────────────────────────────────
 async function throwIfResNotOk(res: Response) {
@@ -35,6 +54,7 @@ export async function apiRequest(
     method,
     headers,
     body: data ? JSON.stringify(data) : undefined,
+    signal: AbortSignal.timeout(8000),
   });
 
   await throwIfResNotOk(res);
@@ -42,19 +62,32 @@ export async function apiRequest(
 }
 
 // ─── Default query function ───────────────────────────────────────────────────
-export const getQueryFn: <T>(options: {
-  on401: "returnNull" | "throw";
-}) => QueryFunction<T> =
-  ({ on401: unauthorizedBehavior }) =>
+// For /api/items and /api/collections: if backend is unavailable, return local store.
+export const getQueryFn: <T>(options: { on401: "returnNull" | "throw" }) => QueryFunction<T> =
+  ({ on401 }) =>
   async ({ queryKey }) => {
-    const res = await fetch(`${API_BASE}${queryKey[0] as string}`);
+    const key = queryKey[0] as string;
+    try {
+      const res = await fetch(`${API_BASE}${key}`, { signal: AbortSignal.timeout(5000) });
 
-    if (unauthorizedBehavior === "returnNull" && res.status === 401) {
-      return null;
+      if (on401 === "returnNull" && res.status === 401) return null as T;
+      await throwIfResNotOk(res);
+
+      const data = await res.json();
+      setBackendAvailable(true);
+
+      // Sync local store
+      if (key === "/api/items") localStore.replaceItems(data);
+      if (key === "/api/collections") localStore.replaceCollections(data);
+
+      return data as T;
+    } catch {
+      setBackendAvailable(false);
+      // Fall back to local store
+      if (key === "/api/items") return localStore.getItems() as T;
+      if (key.startsWith("/api/collections") && !key.includes("/items")) return localStore.getCollections() as T;
+      return [] as T;
     }
-
-    await throwIfResNotOk(res);
-    return await res.json();
   };
 
 export const queryClient = new QueryClient({

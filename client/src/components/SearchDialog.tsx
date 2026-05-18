@@ -1,6 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { apiRequest } from "@/lib/queryClient";
+import { useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import {
   Dialog,
@@ -10,7 +9,6 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import {
   Select,
   SelectContent,
@@ -19,46 +17,18 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Search, Plus, Loader2, BookOpen, Tv, Film, Star, Book } from "lucide-react";
-import { MEDIA_TYPES, STATUSES, type MediaType } from "@shared/schema";
+import { MEDIA_TYPES } from "@shared/schema";
 import { cn } from "@/lib/utils";
+import { searchAll, type SearchResult } from "@/lib/search";
+import { apiRequest, isBackendAvailable } from "@/lib/queryClient";
+import { localStore } from "@/lib/localStore";
 
 const TYPE_ICONS: Record<string, any> = {
-  anime: Star,
-  manga: BookOpen,
-  movie: Film,
-  series: Tv,
-  book: Book,
+  anime: Star, manga: BookOpen, movie: Film, series: Tv, book: Book,
 };
-
 const TYPE_LABELS: Record<string, string> = {
-  anime: "Anime",
-  manga: "Manga",
-  movie: "Movie",
-  series: "Series",
-  book: "Book",
+  anime: "Anime", manga: "Manga", movie: "Movie", series: "Series", book: "Book",
 };
-
-const STATUS_LABELS: Record<string, string> = {
-  watching: "Watching",
-  reading: "Reading",
-  completed: "Completed",
-  on_hold: "On Hold",
-  dropped: "Dropped",
-  wishlist: "Wishlist",
-};
-
-interface SearchResult {
-  externalId: string;
-  externalSource: string;
-  title: string;
-  coverUrl?: string;
-  year?: string;
-  mediaType: MediaType;
-  genres?: string;
-  author?: string;
-  studio?: string;
-  episodes?: number;
-}
 
 export default function SearchDialog({
   open,
@@ -73,7 +43,7 @@ export default function SearchDialog({
   const [loading, setLoading] = useState(false);
   const [adding, setAdding] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
-  const debounceRef = useRef<NodeJS.Timeout>();
+  const debounceRef = useRef<ReturnType<typeof setTimeout>>();
   const { toast } = useToast();
   const qc = useQueryClient();
 
@@ -92,10 +62,9 @@ export default function SearchDialog({
     debounceRef.current = setTimeout(async () => {
       setLoading(true);
       try {
-        const typeParam = filterType !== "all" ? `&type=${filterType}` : "";
-        const res = await apiRequest("GET", `/api/search?q=${encodeURIComponent(query)}${typeParam}`);
-        const data = await res.json();
-        setResults(Array.isArray(data) ? data : []);
+        const type = filterType !== "all" ? filterType : undefined;
+        const data = await searchAll(query, type);
+        setResults(data);
       } catch {
         setResults([]);
       } finally {
@@ -108,29 +77,37 @@ export default function SearchDialog({
   async function addItem(result: SearchResult) {
     const key = result.externalId + result.externalSource;
     setAdding(key);
+    const payload = {
+      title: result.title,
+      mediaType: result.mediaType,
+      status: "wishlist" as const,
+      coverUrl: result.coverUrl ?? null,
+      year: result.year ?? null,
+      externalId: result.externalId,
+      externalSource: result.externalSource,
+      genres: result.genres ?? null,
+      author: result.author ?? null,
+      studio: result.studio ?? null,
+      episodes: result.episodes ?? null,
+      userId: 1,
+      rating: null,
+      notes: null,
+    };
     try {
-      const res = await apiRequest("POST", "/api/items", {
-        title: result.title,
-        mediaType: result.mediaType,
-        status: "wishlist",
-        coverUrl: result.coverUrl,
-        year: result.year,
-        externalId: result.externalId,
-        externalSource: result.externalSource,
-        genres: result.genres,
-        author: result.author,
-        studio: result.studio,
-        episodes: result.episodes,
-      });
-      if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.error || "Failed to add");
-      }
+      await apiRequest("POST", "/api/items", payload);
       await qc.invalidateQueries({ queryKey: ["/api/items"] });
       toast({ title: "Added to library", description: result.title });
       onOpenChange(false);
-    } catch (err: any) {
-      toast({ title: "Error", description: err.message, variant: "destructive" });
+    } catch {
+      // Backend unavailable — save to local in-memory store
+      localStore.addItem(payload);
+      // Update the query cache directly so the UI reflects it immediately
+      qc.setQueryData<any[]>("/api/items", (old = []) => [
+        ...old,
+        { id: Date.now(), ...payload },
+      ]);
+      toast({ title: "Added to library", description: `${result.title} (saved locally — backend offline)` });
+      onOpenChange(false);
     } finally {
       setAdding(null);
     }
@@ -194,7 +171,7 @@ export default function SearchDialog({
             <div className="flex flex-col items-center justify-center py-12 text-center text-muted-foreground">
               <Search size={32} className="mb-3 opacity-30" />
               <p className="text-sm">Type to search across all media</p>
-              <p className="text-xs mt-1">Anime, manga, movies, series, and books</p>
+              <p className="text-xs mt-1">Anime · Manga · Movies · Series · Books</p>
             </div>
           )}
 
