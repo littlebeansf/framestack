@@ -16,11 +16,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Search, Plus, Loader2, BookOpen, Tv, Film, Star, Book } from "lucide-react";
+import { Search, Plus, Loader2, BookOpen, Tv, Film, Star, Book, Check } from "lucide-react";
 import { MEDIA_TYPES } from "@shared/schema";
 import { cn } from "@/lib/utils";
 import { searchAll, type SearchResult } from "@/lib/search";
-import { apiRequest, isBackendAvailable } from "@/lib/queryClient";
+import { apiRequest } from "@/lib/queryClient";
 import { localStore } from "@/lib/localStore";
 
 const TYPE_ICONS: Record<string, any> = {
@@ -41,7 +41,8 @@ export default function SearchDialog({
   const [filterType, setFilterType] = useState<string>("all");
   const [results, setResults] = useState<SearchResult[]>([]);
   const [loading, setLoading] = useState(false);
-  const [adding, setAdding] = useState<string | null>(null);
+  // Track state per result: null = idle, "adding" = in flight, "added" = done
+  const [itemStates, setItemStates] = useState<Record<string, "adding" | "added">>({});
   const inputRef = useRef<HTMLInputElement>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout>>();
   const { toast } = useToast();
@@ -53,6 +54,7 @@ export default function SearchDialog({
     } else {
       setQuery("");
       setResults([]);
+      setItemStates({});
     }
   }, [open]);
 
@@ -76,7 +78,7 @@ export default function SearchDialog({
 
   async function addItem(result: SearchResult) {
     const key = result.externalId + result.externalSource;
-    setAdding(key);
+    setItemStates(s => ({ ...s, [key]: "adding" }));
     const payload = {
       title: result.title,
       mediaType: result.mediaType,
@@ -96,19 +98,14 @@ export default function SearchDialog({
     try {
       const res = await apiRequest("POST", "/api/items", payload);
       const newItem = await res.json();
-      // Optimistically update the cache without triggering a refetch
       qc.setQueryData<any[]>(["/api/items"], (old = []) => [...old, newItem]);
-      toast({ title: "Added to library", description: result.title });
-      onOpenChange(false);
     } catch {
-      // Backend unavailable — save in-memory and update cache directly
       const localItem = localStore.addItem(payload);
       qc.setQueryData<any[]>(["/api/items"], (old = []) => [...old, localItem]);
-      toast({ title: "Added to library", description: result.title });
-      onOpenChange(false);
-    } finally {
-      setAdding(null);
     }
+    setItemStates(s => ({ ...s, [key]: "added" }));
+    toast({ title: "Added to library", description: result.title });
+    // Don't close the dialog — user can keep adding
   }
 
   const filteredResults = filterType === "all"
@@ -178,6 +175,9 @@ export default function SearchDialog({
               {filteredResults.map((result) => {
                 const key = result.externalId + result.externalSource;
                 const Icon = TYPE_ICONS[result.mediaType] || Star;
+                const state = itemStates[key];
+                const isAdded = state === "added";
+                const isAdding = state === "adding";
                 return (
                   <li
                     key={key}
@@ -218,17 +218,25 @@ export default function SearchDialog({
                       </div>
                     </div>
 
-                    {/* Add button */}
+                    {/* Add / Added button */}
                     <Button
                       size="sm"
-                      variant="outline"
-                      onClick={() => addItem(result)}
-                      disabled={adding === key}
+                      variant={isAdded ? "secondary" : "outline"}
+                      onClick={() => !isAdded && addItem(result)}
+                      disabled={isAdding || isAdded}
                       data-testid={`button-add-${key}`}
-                      className="shrink-0 h-8 px-3 text-xs"
+                      className={cn(
+                        "shrink-0 h-8 px-3 text-xs",
+                        isAdded && "text-green-500 border-green-500/30"
+                      )}
                     >
-                      {adding === key ? (
+                      {isAdding ? (
                         <Loader2 size={12} className="animate-spin" />
+                      ) : isAdded ? (
+                        <>
+                          <Check size={12} className="mr-1" />
+                          Added
+                        </>
                       ) : (
                         <>
                           <Plus size={12} className="mr-1" />

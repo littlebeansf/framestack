@@ -63,17 +63,23 @@ export default function ItemEditDialog({
     });
   }, [item]);
 
+  // Use the default queryFn (has offline fallback via localStore)
   const { data: allCollections } = useQuery<Collection[]>({
     queryKey: ["/api/collections"],
-    queryFn: () => apiRequest("GET", "/api/collections").then(r => r.json()),
-    enabled: open,
   });
 
-  const { data: itemCollections, refetch: refetchItemCols } = useQuery<Collection[]>({
-    queryKey: ["/api/items", item.id, "collections"],
-    queryFn: () => apiRequest("GET", `/api/items/${item.id}/collections`).then(r => r.json()),
-    enabled: open,
-  });
+  // Track which collections this item belongs to — in local state so we can update instantly
+  const [itemColIds, setItemColIds] = useState<Set<number>>(new Set());
+
+  // Populate from backend when dialog opens
+  useEffect(() => {
+    if (!open) return;
+    apiRequest("GET", `/api/items/${item.id}/collections`)
+      .then(r => r.json())
+      .then((cols: Collection[]) => setItemColIds(new Set(cols.map(c => c.id))))
+      .catch(() => setItemColIds(new Set()));
+  }, [open, item.id]);
+
 
   const updateMutation = useMutation({
     mutationFn: async (data: any) => {
@@ -95,19 +101,41 @@ export default function ItemEditDialog({
   });
 
   const addToColMutation = useMutation({
-    mutationFn: (collectionId: number) =>
-      apiRequest("POST", `/api/collections/${collectionId}/items`, { itemId: item.id }).then(r => r.json()),
-    onSuccess: () => refetchItemCols(),
+    mutationFn: async (collectionId: number) => {
+      try {
+        await apiRequest("POST", `/api/collections/${collectionId}/items`, { itemId: item.id });
+      } catch { /* offline — update state only */ }
+      return collectionId;
+    },
+    onSuccess: (collectionId: number) => {
+      setItemColIds(prev => new Set([...prev, collectionId]));
+      // Also update collection-detail cache if open
+      qc.setQueryData<any[]>(["/api/collections", collectionId, "items"], (old = []) => {
+        if (old.some(i => i.id === item.id)) return old;
+        return [...old, item];
+      });
+      toast({ title: "Added to collection" });
+    },
   });
 
   const removeFromColMutation = useMutation({
-    mutationFn: ({ collectionId }: { collectionId: number }) =>
-      apiRequest("DELETE", `/api/collections/${collectionId}/items/${item.id}`).then(r => r.json()),
-    onSuccess: () => refetchItemCols(),
+    mutationFn: async ({ collectionId }: { collectionId: number }) => {
+      try {
+        await apiRequest("DELETE", `/api/collections/${collectionId}/items/${item.id}`);
+      } catch { /* offline — update state only */ }
+      return collectionId;
+    },
+    onSuccess: (collectionId: number) => {
+      setItemColIds(prev => { const s = new Set(prev); s.delete(collectionId); return s; });
+      qc.setQueryData<any[]>(["/api/collections", collectionId, "items"], (old = []) =>
+        old.filter(i => i.id !== item.id)
+      );
+      toast({ title: "Removed from collection" });
+    },
   });
 
-  const itemColIds = new Set((itemCollections || []).map(c => c.id));
   const availableCollections = (allCollections || []).filter(c => !itemColIds.has(c.id));
+  const currentCollections = (allCollections || []).filter(c => itemColIds.has(c.id));
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -208,9 +236,9 @@ export default function ItemEditDialog({
           <div className="space-y-2">
             <Label className="text-xs">Collections</Label>
 
-            {(itemCollections || []).length > 0 && (
+            {currentCollections.length > 0 && (
               <div className="flex flex-wrap gap-1.5 mb-2">
-                {(itemCollections || []).map(col => (
+                {currentCollections.map(col => (
                   <Badge
                     key={col.id}
                     variant="secondary"
