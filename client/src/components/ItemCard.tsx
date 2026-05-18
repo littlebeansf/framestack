@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
+import { localStore } from "@/lib/localStore";
 import { useToast } from "@/hooks/use-toast";
 import type { Item } from "@shared/schema";
 import { cn } from "@/lib/utils";
@@ -46,9 +47,16 @@ export default function ItemCard({ item }: { item: Item }) {
   const qc = useQueryClient();
 
   const deleteMutation = useMutation({
-    mutationFn: () => apiRequest("DELETE", `/api/items/${item.id}`).then(r => r.json()),
+    mutationFn: async () => {
+      try {
+        await apiRequest("DELETE", `/api/items/${item.id}`);
+      } catch {
+        // backend offline — remove from local store
+        localStore.deleteItem(item.id);
+      }
+    },
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["/api/items"] });
+      qc.setQueryData<any[]>(["/api/items"], (old = []) => old.filter(i => i.id !== item.id));
       toast({ title: "Removed from library", description: item.title });
     },
   });

@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
+import { localStore } from "@/lib/localStore";
 import { useToast } from "@/hooks/use-toast";
 import type { Item, Collection } from "@shared/schema";
 import { MEDIA_TYPES, STATUSES } from "@shared/schema";
@@ -75,9 +76,19 @@ export default function ItemEditDialog({
   });
 
   const updateMutation = useMutation({
-    mutationFn: (data: any) => apiRequest("PATCH", `/api/items/${item.id}`, data).then(r => r.json()),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["/api/items"] });
+    mutationFn: async (data: any) => {
+      try {
+        const res = await apiRequest("PATCH", `/api/items/${item.id}`, data);
+        return await res.json();
+      } catch {
+        // backend offline — update local store
+        return localStore.updateItem(item.id, data) ?? { ...item, ...data };
+      }
+    },
+    onSuccess: (updated: any) => {
+      qc.setQueryData<any[]>(["/api/items"], (old = []) =>
+        old.map(i => i.id === item.id ? { ...i, ...updated } : i)
+      );
       toast({ title: "Updated", description: item.title });
       onOpenChange(false);
     },

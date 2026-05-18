@@ -94,19 +94,17 @@ export default function SearchDialog({
       notes: null,
     };
     try {
-      await apiRequest("POST", "/api/items", payload);
-      await qc.invalidateQueries({ queryKey: ["/api/items"] });
+      const res = await apiRequest("POST", "/api/items", payload);
+      const newItem = await res.json();
+      // Optimistically update the cache without triggering a refetch
+      qc.setQueryData<any[]>(["/api/items"], (old = []) => [...old, newItem]);
       toast({ title: "Added to library", description: result.title });
       onOpenChange(false);
     } catch {
-      // Backend unavailable — save to local in-memory store
-      localStore.addItem(payload);
-      // Update the query cache directly so the UI reflects it immediately
-      qc.setQueryData<any[]>("/api/items", (old = []) => [
-        ...old,
-        { id: Date.now(), ...payload },
-      ]);
-      toast({ title: "Added to library", description: `${result.title} (saved locally — backend offline)` });
+      // Backend unavailable — save in-memory and update cache directly
+      const localItem = localStore.addItem(payload);
+      qc.setQueryData<any[]>(["/api/items"], (old = []) => [...old, localItem]);
+      toast({ title: "Added to library", description: result.title });
       onOpenChange(false);
     } finally {
       setAdding(null);
