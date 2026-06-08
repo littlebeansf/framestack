@@ -33,7 +33,7 @@ export default function ProfilePage() {
   })).filter(x => x.count > 0);
 
   return (
-    <div className="max-w-xl space-y-8">
+    <div className="max-w-xl space-y-8 animate-page-in">
       <div>
         <h1 className="text-xl font-bold text-foreground mb-1" style={{ fontFamily: "'Cabinet Grotesk', sans-serif" }}>
           Stats

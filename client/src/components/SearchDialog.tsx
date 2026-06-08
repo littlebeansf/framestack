@@ -16,8 +16,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Search, Plus, Loader2, BookOpen, Tv, Film, Star, Book, Check } from "lucide-react";
+import { Search, Plus, Loader2, BookOpen, Tv, Film, Star, Book, Check, Library } from "lucide-react";
 import { MEDIA_TYPES } from "@shared/schema";
+import type { Item } from "@shared/schema";
 import { cn } from "@/lib/utils";
 import { searchAll, type SearchResult } from "@/lib/search";
 import { apiRequest } from "@/lib/queryClient";
@@ -75,6 +76,17 @@ export default function SearchDialog({
     }, 500);
     return () => clearTimeout(debounceRef.current);
   }, [query, filterType]);
+
+  // Check if a result is already in the library (by externalId match in query cache or localStore)
+  function isInLibrary(result: SearchResult): boolean {
+    // Check query cache first (fast path)
+    const cached = qc.getQueryData<Item[]>(["/api/items"]) ?? [];
+    if (cached.some(i => i.externalId === result.externalId && i.externalSource === result.externalSource)) {
+      return true;
+    }
+    // Check localStore as fallback
+    return localStore.hasExternalId(result.externalId, result.externalSource);
+  }
 
   async function addItem(result: SearchResult) {
     const key = result.externalId + result.externalSource;
@@ -176,13 +188,18 @@ export default function SearchDialog({
                 const key = result.externalId + result.externalSource;
                 const Icon = TYPE_ICONS[result.mediaType] || Star;
                 const state = itemStates[key];
-                const isAdded = state === "added";
+                const alreadyInLib = isInLibrary(result);
+                const isAdded = state === "added" || alreadyInLib;
                 const isAdding = state === "adding";
+
                 return (
                   <li
                     key={key}
                     data-testid={`result-item-${key}`}
-                    className="flex items-center gap-3 px-5 py-3 hover:bg-secondary/40 transition-colors"
+                    className={cn(
+                      "flex items-center gap-3 px-5 py-3 transition-colors",
+                      isAdded ? "opacity-60" : "hover:bg-secondary/40"
+                    )}
                   >
                     {/* Cover */}
                     <div className="w-10 h-14 rounded shrink-0 overflow-hidden bg-secondary flex items-center justify-center">
@@ -214,6 +231,13 @@ export default function SearchDialog({
                         )}
                         {result.studio && (
                           <span className="text-xs text-muted-foreground truncate max-w-[180px]">{result.studio}</span>
+                        )}
+                        {/* Already in library indicator */}
+                        {alreadyInLib && (
+                          <span className="text-[10px] text-primary/70 flex items-center gap-0.5 ml-1">
+                            <Library size={9} />
+                            In library
+                          </span>
                         )}
                       </div>
                     </div>

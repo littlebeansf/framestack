@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { localStore } from "@/lib/localStore";
-import type { Collection } from "@shared/schema";
+import type { Collection, Item } from "@shared/schema";
 import { useLocation } from "wouter";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
@@ -23,7 +23,8 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { FolderOpen, Plus, MoreHorizontal, Trash2, Edit3, ChevronRight } from "lucide-react";
+import { FolderOpen, Plus, MoreHorizontal, Trash2, Edit3, ChevronRight, Layers } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 function SkeletonCollection() {
   return (
@@ -31,6 +32,39 @@ function SkeletonCollection() {
       <div className="h-4 skeleton rounded w-1/2" />
       <div className="h-3 skeleton rounded w-3/4" />
       <div className="h-3 skeleton rounded w-1/4" />
+    </div>
+  );
+}
+
+/** Mosaic of up to 4 cover thumbnails for a collection */
+function CoverMosaic({ covers }: { covers: string[] }) {
+  const filled = covers.slice(0, 4);
+  const empty = 4 - filled.length;
+
+  if (filled.length === 0) {
+    return (
+      <div className="w-16 h-20 rounded-md bg-secondary flex items-center justify-center shrink-0">
+        <Layers size={18} className="text-muted-foreground/30" />
+      </div>
+    );
+  }
+
+  return (
+    <div className="w-16 h-20 rounded-md overflow-hidden grid grid-cols-2 grid-rows-2 shrink-0 border border-border/50">
+      {filled.map((src, i) => (
+        <div key={i} className="overflow-hidden bg-secondary">
+          <img
+            src={src}
+            alt=""
+            className="w-full h-full object-cover"
+            loading="lazy"
+            onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
+          />
+        </div>
+      ))}
+      {Array.from({ length: empty }).map((_, i) => (
+        <div key={`e${i}`} className="bg-secondary/60" />
+      ))}
     </div>
   );
 }
@@ -58,7 +92,6 @@ function CreateEditDialog({
         const res = await apiRequest("POST", "/api/collections", form);
         return await res.json();
       } catch {
-        // backend offline — use local store
         if (existing) {
           return localStore.updateCollection(existing.id, form) ?? { ...existing, ...form };
         }
@@ -81,7 +114,7 @@ function CreateEditDialog({
     },
   });
 
-  // Reset form when opening
+  // Reset form when opening with existing data
   if (open && form.name === "" && existing?.name) {
     setForm({ name: existing.name, description: existing.description ?? "" });
   }
@@ -140,6 +173,27 @@ export default function CollectionsPage() {
     queryKey: ["/api/collections"],
   });
 
+  // Grab all items so we can show collection covers & item counts
+  const { data: allItems } = useQuery<Item[]>({
+    queryKey: ["/api/items"],
+    queryFn: () => apiRequest("GET", "/api/items").then(r => r.json()),
+  });
+
+  // Build a map: collectionId → items (from collection-detail caches already populated)
+  // Since we can't guarantee they're all fetched, we fall back to an empty array
+  function getCollectionCovers(colId: number): string[] {
+    const cached = qc.getQueryData<Item[]>(["/api/collections", colId, "items"]) ?? [];
+    return cached
+      .filter(i => !!i.coverUrl)
+      .map(i => i.coverUrl!)
+      .slice(0, 4);
+  }
+
+  function getCollectionCount(colId: number): number | null {
+    const cached = qc.getQueryData<Item[]>(["/api/collections", colId, "items"]);
+    return cached ? cached.length : null;
+  }
+
   const deleteMutation = useMutation({
     mutationFn: async (id: number) => {
       try {
@@ -156,7 +210,7 @@ export default function CollectionsPage() {
   });
 
   return (
-    <div className="max-w-3xl">
+    <div className="max-w-3xl animate-page-in">
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-xl font-bold text-foreground flex items-center gap-2" style={{ fontFamily: "'Cabinet Grotesk', sans-serif" }}>
@@ -181,71 +235,100 @@ export default function CollectionsPage() {
           {Array.from({ length: 4 }).map((_, i) => <SkeletonCollection key={i} />)}
         </div>
       ) : (collections || []).length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-20 text-center text-muted-foreground">
-          <FolderOpen size={40} className="mb-4 opacity-20" />
-          <p className="font-medium text-foreground text-sm">No collections yet</p>
-          <p className="text-xs mt-1 max-w-xs">Create a collection to group related media — like "Recs from friends" or "Summer watchlist".</p>
-          <Button onClick={() => setCreateOpen(true)} size="sm" className="mt-4 gap-1.5" variant="outline">
+        <div className="flex flex-col items-center justify-center py-24 text-center text-muted-foreground">
+          <div className="relative mb-5">
+            <FolderOpen size={44} className="opacity-10" />
+            <div className="absolute inset-0 flex items-center justify-center">
+              <FolderOpen size={22} className="text-primary opacity-60" />
+            </div>
+          </div>
+          <p className="font-semibold text-foreground text-sm mb-1">No collections yet</p>
+          <p className="text-xs max-w-[240px] leading-relaxed">
+            Create a collection to group related media — like "Recs from friends" or "Summer watchlist".
+          </p>
+          <Button onClick={() => setCreateOpen(true)} size="sm" className="mt-5 gap-1.5" variant="outline">
             <Plus size={14} />
             Create your first collection
           </Button>
         </div>
       ) : (
         <div className="grid gap-3 sm:grid-cols-2">
-          {(collections || []).map(col => (
-            <div
-              key={col.id}
-              data-testid={`card-collection-${col.id}`}
-              className="group relative rounded-lg border border-border bg-card p-4 hover:border-border/60 hover:shadow-md hover:shadow-black/20 transition-all cursor-pointer"
-              onClick={() => setLocation(`/collections/${col.id}`)}
-            >
-              {/* Cover swatch using first item cover if available */}
-              <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-2 mb-1">
-                    <FolderOpen size={14} className="text-primary shrink-0" />
-                    <h3 className="font-semibold text-sm text-foreground truncate">{col.name}</h3>
+          {(collections || []).map((col, idx) => {
+            const covers = getCollectionCovers(col.id);
+            const count = getCollectionCount(col.id);
+
+            return (
+              <div
+                key={col.id}
+                data-testid={`card-collection-${col.id}`}
+                className={cn(
+                  "group relative rounded-lg border border-border bg-card p-4",
+                  "hover:border-primary/25 hover:shadow-lg hover:shadow-black/20",
+                  "transition-all duration-300 cursor-pointer",
+                  "animate-card-in"
+                )}
+                style={{ animationDelay: `${idx * 60}ms`, animationFillMode: "both" }}
+                onClick={() => setLocation(`/collections/${col.id}`)}
+              >
+                <div className="flex items-start gap-3">
+                  {/* Cover mosaic */}
+                  <CoverMosaic covers={covers} />
+
+                  {/* Info */}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0 flex-1">
+                        <h3 className="font-semibold text-sm text-foreground truncate mb-0.5">{col.name}</h3>
+                        {col.description && (
+                          <p className="text-xs text-muted-foreground line-clamp-2 leading-relaxed">{col.description}</p>
+                        )}
+                        {count !== null && (
+                          <p className="text-[10px] text-muted-foreground/60 mt-2 flex items-center gap-1">
+                            <Layers size={9} />
+                            {count} item{count !== 1 ? "s" : ""}
+                          </p>
+                        )}
+                      </div>
+
+                      {/* Actions */}
+                      <div
+                        className="shrink-0 flex items-center gap-0.5"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <button
+                              data-testid={`button-col-menu-${col.id}`}
+                              className="w-7 h-7 rounded flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"
+                              aria-label="Collection options"
+                            >
+                              <MoreHorizontal size={14} />
+                            </button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end" className="w-36">
+                            <DropdownMenuItem onClick={() => setEditTarget(col)}>
+                              <Edit3 size={13} className="mr-2" />
+                              Edit
+                            </DropdownMenuItem>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem
+                              className="text-destructive focus:text-destructive"
+                              onClick={() => deleteMutation.mutate(col.id)}
+                            >
+                              <Trash2 size={13} className="mr-2" />
+                              Delete
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+
+                        <ChevronRight size={13} className="text-muted-foreground/40 group-hover:text-muted-foreground transition-colors" />
+                      </div>
+                    </div>
                   </div>
-                  {col.description && (
-                    <p className="text-xs text-muted-foreground line-clamp-2">{col.description}</p>
-                  )}
-                </div>
-
-                <div
-                  className="shrink-0 flex items-center gap-1"
-                  onClick={(e) => e.stopPropagation()}
-                >
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <button
-                        data-testid={`button-col-menu-${col.id}`}
-                        className="w-7 h-7 rounded flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"
-                        aria-label="Collection options"
-                      >
-                        <MoreHorizontal size={14} />
-                      </button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end" className="w-36">
-                      <DropdownMenuItem onClick={() => setEditTarget(col)}>
-                        <Edit3 size={13} className="mr-2" />
-                        Edit
-                      </DropdownMenuItem>
-                      <DropdownMenuSeparator />
-                      <DropdownMenuItem
-                        className="text-destructive focus:text-destructive"
-                        onClick={() => deleteMutation.mutate(col.id)}
-                      >
-                        <Trash2 size={13} className="mr-2" />
-                        Delete
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-
-                  <ChevronRight size={14} className="text-muted-foreground/50" />
                 </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
 

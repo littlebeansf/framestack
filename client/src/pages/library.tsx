@@ -5,7 +5,7 @@ import type { Item } from "@shared/schema";
 import { MEDIA_TYPES, STATUSES } from "@shared/schema";
 import ItemCard from "@/components/ItemCard";
 import { cn } from "@/lib/utils";
-import { Search, BookOpen, Library, SlidersHorizontal } from "lucide-react";
+import { Search, BookOpen, Library, SlidersHorizontal, Sparkles } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import {
   Select,
@@ -32,12 +32,12 @@ const STATUS_LABELS: Record<string, string> = {
 };
 
 const STATUS_DOTS: Record<string, string> = {
-  watching: "bg-[hsl(190,75%,55%)]",
-  reading: "bg-[hsl(255,75%,70%)]",
+  watching:  "bg-[hsl(190,75%,55%)]",
+  reading:   "bg-[hsl(255,75%,70%)]",
   completed: "bg-[hsl(160,65%,50%)]",
-  on_hold: "bg-[hsl(30,85%,65%)]",
-  dropped: "bg-[hsl(0,65%,60%)]",
-  wishlist: "bg-[hsl(220,8%,55%)]",
+  on_hold:   "bg-[hsl(30,85%,65%)]",
+  dropped:   "bg-[hsl(0,65%,60%)]",
+  wishlist:  "bg-[hsl(220,8%,55%)]",
 };
 
 function SkeletonCard() {
@@ -56,7 +56,7 @@ export default function LibraryPage() {
   const [search, setSearch] = useState("");
   const [typeFilter, setTypeFilter] = useState<string>("all");
   const [statusFilter, setStatusFilter] = useState<string>("all");
-  const [sortBy, setSortBy] = useState<string>("title");
+  const [sortBy, setSortBy] = useState<string>("recent");
 
   const { data: items, isLoading } = useQuery<Item[]>({
     queryKey: ["/api/items"],
@@ -72,6 +72,7 @@ export default function LibraryPage() {
     if (sortBy === "title") return a.title.localeCompare(b.title);
     if (sortBy === "rating") return (b.rating ?? 0) - (a.rating ?? 0);
     if (sortBy === "year") return (b.year ?? "0").localeCompare(a.year ?? "0");
+    if (sortBy === "recent") return b.id - a.id; // higher id = added later
     return 0;
   });
 
@@ -85,10 +86,10 @@ export default function LibraryPage() {
     <div className="space-y-4">
       <div>
         <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">Type</p>
-        <div className="space-y-1">
+        <div className="space-y-0.5">
           <button
             onClick={() => setTypeFilter("all")}
-            className={cn("w-full text-left text-sm px-2 py-1.5 rounded transition-colors",
+            className={cn("w-full text-left text-sm px-2 py-1.5 rounded-md transition-all duration-150",
               typeFilter === "all" ? "bg-accent text-accent-foreground font-medium" : "text-muted-foreground hover:text-foreground hover:bg-secondary"
             )}
           >
@@ -98,13 +99,13 @@ export default function LibraryPage() {
             <button
               key={t}
               onClick={() => setTypeFilter(t)}
-              className={cn("w-full text-left text-sm px-2 py-1.5 rounded transition-colors flex items-center gap-2",
+              className={cn("w-full text-left text-sm px-2 py-1.5 rounded-md transition-all duration-150 flex items-center gap-2",
                 typeFilter === t ? "bg-accent text-accent-foreground font-medium" : "text-muted-foreground hover:text-foreground hover:bg-secondary"
               )}
             >
-              <span className={cn("inline-block w-2 h-2 rounded-sm", `badge-${t}`)} />
+              <span className={cn("inline-block w-2 h-2 rounded-sm shrink-0", `badge-${t}`)} />
               {TYPE_LABELS[t]}
-              <span className="ml-auto text-xs opacity-60">{(items || []).filter(i => i.mediaType === t).length}</span>
+              <span className="ml-auto text-xs opacity-50">{(items || []).filter(i => i.mediaType === t).length}</span>
             </button>
           ))}
         </div>
@@ -112,10 +113,10 @@ export default function LibraryPage() {
 
       <div>
         <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">Status</p>
-        <div className="space-y-1">
+        <div className="space-y-0.5">
           <button
             onClick={() => setStatusFilter("all")}
-            className={cn("w-full text-left text-sm px-2 py-1.5 rounded transition-colors",
+            className={cn("w-full text-left text-sm px-2 py-1.5 rounded-md transition-all duration-150",
               statusFilter === "all" ? "bg-accent text-accent-foreground font-medium" : "text-muted-foreground hover:text-foreground hover:bg-secondary"
             )}
           >
@@ -125,13 +126,13 @@ export default function LibraryPage() {
             <button
               key={s}
               onClick={() => setStatusFilter(s)}
-              className={cn("w-full text-left text-sm px-2 py-1.5 rounded transition-colors flex items-center gap-2",
+              className={cn("w-full text-left text-sm px-2 py-1.5 rounded-md transition-all duration-150 flex items-center gap-2",
                 statusFilter === s ? "bg-accent text-accent-foreground font-medium" : "text-muted-foreground hover:text-foreground hover:bg-secondary"
               )}
             >
-              <span className={cn("inline-block w-2 h-2 rounded-full", STATUS_DOTS[s])} />
+              <span className={cn("inline-block w-2 h-2 rounded-full shrink-0", STATUS_DOTS[s])} />
               {STATUS_LABELS[s]}
-              <span className="ml-auto text-xs opacity-60">{stats[s] || 0}</span>
+              <span className="ml-auto text-xs opacity-50">{stats[s] || 0}</span>
             </button>
           ))}
         </div>
@@ -140,7 +141,7 @@ export default function LibraryPage() {
   );
 
   return (
-    <div className="flex gap-6 h-full">
+    <div className="flex gap-6 h-full animate-page-in">
       {/* Desktop sidebar filters */}
       <aside className="hidden lg:block w-44 shrink-0">
         <div className="sticky top-0">
@@ -172,6 +173,7 @@ export default function LibraryPage() {
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
+              <SelectItem value="recent">Sort: Recent</SelectItem>
               <SelectItem value="title">Sort: Title</SelectItem>
               <SelectItem value="rating">Sort: Rating</SelectItem>
               <SelectItem value="year">Sort: Year</SelectItem>
@@ -209,21 +211,32 @@ export default function LibraryPage() {
             {Array.from({ length: 12 }).map((_, i) => <SkeletonCard key={i} />)}
           </div>
         ) : filtered.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-20 text-center text-muted-foreground">
-            <BookOpen size={40} className="mb-4 opacity-20" />
-            <p className="font-medium text-foreground text-sm">
-              {(items || []).length === 0 ? "Your library is empty" : "No items match your filters"}
-            </p>
-            <p className="text-xs mt-1 max-w-xs">
-              {(items || []).length === 0
-                ? "Use the search bar in the sidebar to find and add anime, manga, movies, series, and books."
-                : "Try changing or clearing your filters."}
-            </p>
+          <div className="flex flex-col items-center justify-center py-24 text-center text-muted-foreground animate-page-in">
+            {(items || []).length === 0 ? (
+              <>
+                <div className="relative mb-5">
+                  <Sparkles size={44} className="opacity-10" />
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <Sparkles size={22} className="text-primary opacity-60" />
+                  </div>
+                </div>
+                <p className="font-semibold text-foreground text-sm mb-1">Your library is empty</p>
+                <p className="text-xs max-w-[240px] leading-relaxed">
+                  Hit the search icon in the sidebar to find anime, manga, movies, series and books — then add them here.
+                </p>
+              </>
+            ) : (
+              <>
+                <BookOpen size={40} className="mb-4 opacity-15" />
+                <p className="font-medium text-foreground text-sm">No matches</p>
+                <p className="text-xs mt-1">Try changing or clearing your filters.</p>
+              </>
+            )}
           </div>
         ) : (
           <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3">
-            {filtered.map(item => (
-              <ItemCard key={item.id} item={item} />
+            {filtered.map((item, i) => (
+              <ItemCard key={item.id} item={item} index={i} />
             ))}
           </div>
         )}

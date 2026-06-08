@@ -4,6 +4,7 @@ import { apiRequest } from "@/lib/queryClient";
 import { localStore } from "@/lib/localStore";
 import { useToast } from "@/hooks/use-toast";
 import type { Item } from "@shared/schema";
+import { STATUSES } from "@shared/schema";
 import { cn } from "@/lib/utils";
 import {
   DropdownMenu,
@@ -24,24 +25,27 @@ const TYPE_ICONS: Record<string, any> = {
 };
 
 const STATUS_COLORS: Record<string, string> = {
-  watching: "hsl(190 75% 55%)",
-  reading: "hsl(255 75% 70%)",
+  watching:  "hsl(190 75% 55%)",
+  reading:   "hsl(255 75% 70%)",
   completed: "hsl(160 65% 50%)",
-  on_hold: "hsl(30 85% 65%)",
-  dropped: "hsl(0 65% 60%)",
-  wishlist: "hsl(220 8% 55%)",
+  on_hold:   "hsl(30 85% 65%)",
+  dropped:   "hsl(0 65% 60%)",
+  wishlist:  "hsl(220 8% 55%)",
 };
 
 const STATUS_LABELS: Record<string, string> = {
-  watching: "Watching",
-  reading: "Reading",
+  watching:  "Watching",
+  reading:   "Reading",
   completed: "Completed",
-  on_hold: "On Hold",
-  dropped: "Dropped",
-  wishlist: "Wishlist",
+  on_hold:   "On Hold",
+  dropped:   "Dropped",
+  wishlist:  "Wishlist",
 };
 
-export default function ItemCard({ item }: { item: Item }) {
+// Cycle through statuses on quick-click
+const STATUS_CYCLE = STATUSES; // watching → reading → completed → on_hold → dropped → wishlist
+
+export default function ItemCard({ item, index = 0 }: { item: Item; index?: number }) {
   const [editOpen, setEditOpen] = useState(false);
   const { toast } = useToast();
   const qc = useQueryClient();
@@ -51,7 +55,6 @@ export default function ItemCard({ item }: { item: Item }) {
       try {
         await apiRequest("DELETE", `/api/items/${item.id}`);
       } catch {
-        // backend offline — remove from local store
         localStore.deleteItem(item.id);
       }
     },
@@ -61,6 +64,31 @@ export default function ItemCard({ item }: { item: Item }) {
     },
   });
 
+  // Quick-cycle status on status-dot click (no dialog needed)
+  const cycleStatusMutation = useMutation({
+    mutationFn: async (newStatus: string) => {
+      try {
+        const res = await apiRequest("PATCH", `/api/items/${item.id}`, { status: newStatus });
+        return await res.json();
+      } catch {
+        return localStore.updateItem(item.id, { status: newStatus }) ?? { ...item, status: newStatus };
+      }
+    },
+    onSuccess: (updated: any) => {
+      qc.setQueryData<any[]>(["/api/items"], (old = []) =>
+        old.map(i => i.id === item.id ? { ...i, ...updated } : i)
+      );
+      toast({ title: STATUS_LABELS[updated.status], description: item.title });
+    },
+  });
+
+  function handleStatusDotClick(e: React.MouseEvent) {
+    e.stopPropagation();
+    const currentIdx = STATUS_CYCLE.indexOf(item.status as any);
+    const nextStatus = STATUS_CYCLE[(currentIdx + 1) % STATUS_CYCLE.length];
+    cycleStatusMutation.mutate(nextStatus);
+  }
+
   const Icon = TYPE_ICONS[item.mediaType] || Star;
   const statusColor = STATUS_COLORS[item.status] || STATUS_COLORS.wishlist;
 
@@ -68,7 +96,12 @@ export default function ItemCard({ item }: { item: Item }) {
     <>
       <div
         data-testid={`card-item-${item.id}`}
-        className="group relative rounded-lg overflow-hidden bg-card border border-border hover:border-border/80 transition-all hover:shadow-lg hover:shadow-black/20 cursor-pointer"
+        className="group relative rounded-lg overflow-hidden bg-card border border-border cursor-pointer
+          transition-all duration-300
+          hover:border-primary/30 hover:shadow-xl hover:shadow-black/30
+          hover:-translate-y-0.5
+          animate-card-in"
+        style={{ animationDelay: `${index * 40}ms`, animationFillMode: "both" }}
         onClick={() => setEditOpen(true)}
       >
         {/* Cover */}
@@ -77,66 +110,81 @@ export default function ItemCard({ item }: { item: Item }) {
             <img
               src={item.coverUrl}
               alt={item.title}
-              className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+              className="w-full h-full object-cover transition-transform duration-500 ease-out group-hover:scale-[1.06]"
               loading="lazy"
               onError={(e) => {
-                (e.target as HTMLImageElement).parentElement!.classList.add("no-cover");
+                (e.target as HTMLImageElement).style.display = "none";
               }}
             />
           ) : (
-            <div className="absolute inset-0 flex items-center justify-center">
-              <Icon size={32} className="text-muted-foreground/40" />
+            <div className="absolute inset-0 flex items-center justify-center bg-secondary">
+              <Icon size={28} className="text-muted-foreground/30" />
             </div>
           )}
 
-          {/* Gradient overlay */}
-          <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+          {/* Bottom gradient overlay */}
+          <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
 
-          {/* Status indicator */}
-          <div
-            className="absolute top-2 left-2 w-2 h-2 rounded-full shadow-sm"
+          {/* Status indicator dot — click to cycle */}
+          <button
+            className="absolute top-2 left-2 w-2.5 h-2.5 rounded-full shadow-md transition-transform duration-150 hover:scale-125 focus:outline-none focus:ring-2 focus:ring-white/40"
             style={{ backgroundColor: statusColor }}
-            title={STATUS_LABELS[item.status]}
+            title={`${STATUS_LABELS[item.status]} — click to change`}
+            onClick={handleStatusDotClick}
+            aria-label={`Status: ${STATUS_LABELS[item.status]}`}
+            data-testid={`button-status-${item.id}`}
           />
 
           {/* Rating badge */}
           {item.rating && (
-            <div className="absolute top-2 right-2 flex items-center gap-0.5 bg-black/60 backdrop-blur-sm rounded px-1.5 py-0.5">
+            <div className="absolute top-2 right-2 flex items-center gap-0.5 bg-black/70 backdrop-blur-sm rounded px-1.5 py-0.5">
               <Star size={9} className="text-yellow-400 fill-yellow-400" />
-              <span className="text-white text-[10px] font-medium leading-none">{item.rating}</span>
+              <span className="text-white text-[10px] font-semibold leading-none">{item.rating}</span>
             </div>
           )}
 
-          {/* Menu button (visible on hover) */}
-          <div
-            className="absolute bottom-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <button
-                  data-testid={`button-item-menu-${item.id}`}
-                  className="w-7 h-7 rounded-md bg-black/60 backdrop-blur-sm flex items-center justify-center text-white hover:bg-black/80 transition-colors"
-                  aria-label="Item options"
-                >
-                  <MoreHorizontal size={14} />
-                </button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-40">
-                <DropdownMenuItem onClick={() => setEditOpen(true)}>
-                  <Edit3 size={13} className="mr-2" />
-                  Edit
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem
-                  className="text-destructive focus:text-destructive"
-                  onClick={() => deleteMutation.mutate()}
-                >
-                  <Trash2 size={13} className="mr-2" />
-                  Remove
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
+          {/* Hover: quick actions overlay */}
+          <div className="absolute bottom-2 left-2 right-2 flex items-center justify-between opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+            {/* Status label pill */}
+            <span
+              className="text-[10px] font-medium px-2 py-0.5 rounded-full"
+              style={{
+                backgroundColor: `${statusColor}33`,
+                color: statusColor,
+                border: `1px solid ${statusColor}55`,
+              }}
+            >
+              {STATUS_LABELS[item.status]}
+            </span>
+
+            {/* Menu button */}
+            <div onClick={(e) => e.stopPropagation()}>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button
+                    data-testid={`button-item-menu-${item.id}`}
+                    className="w-7 h-7 rounded-md bg-black/70 backdrop-blur-sm flex items-center justify-center text-white hover:bg-black/90 transition-colors"
+                    aria-label="Item options"
+                  >
+                    <MoreHorizontal size={14} />
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-40">
+                  <DropdownMenuItem onClick={() => setEditOpen(true)}>
+                    <Edit3 size={13} className="mr-2" />
+                    Edit
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem
+                    className="text-destructive focus:text-destructive"
+                    onClick={() => deleteMutation.mutate()}
+                  >
+                    <Trash2 size={13} className="mr-2" />
+                    Remove
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
           </div>
         </div>
 

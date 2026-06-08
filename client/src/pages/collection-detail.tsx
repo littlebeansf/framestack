@@ -61,7 +61,7 @@ export default function CollectionDetailPage() {
   });
 
   return (
-    <div>
+    <div className="animate-page-in">
       {/* Back + header */}
       <div className="mb-6">
         <button
@@ -74,7 +74,7 @@ export default function CollectionDetailPage() {
         </button>
 
         <div className="flex items-start justify-between gap-4">
-          <div>
+          <div className="animate-page-in">
             <h1 className="text-xl font-bold text-foreground flex items-center gap-2" style={{ fontFamily: "'Cabinet Grotesk', sans-serif" }}>
               <FolderOpen size={18} className="text-primary" />
               {collection?.name ?? "Collection"}

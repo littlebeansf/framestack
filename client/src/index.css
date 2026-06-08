@@ -167,3 +167,41 @@
 .status-on_hold   { color: hsl(30 85% 65%); }
 .status-dropped   { color: hsl(0 65% 60%); }
 .status-wishlist  { color: hsl(220 8% 55%); }
+
+/* ─── Page transition ─────────────────────────────────────────────────────── */
+@keyframes page-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.animate-page-in {
+  animation: page-in 0.3s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+/* ─── Card entrance animation ─────────────────────────────────────────────── */
+@keyframes card-in {
+  from {
+    opacity: 0;
+    transform: translateY(12px) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+.animate-card-in {
+  animation: card-in 0.35s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+/* ─── Reduced motion overrides ────────────────────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  .animate-page-in,
+  .animate-card-in {
+    animation: none !important;
+  }
+}
