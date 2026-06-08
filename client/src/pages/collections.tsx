@@ -176,7 +176,6 @@ export default function CollectionsPage() {
   // Grab all items so we can show collection covers & item counts
   const { data: allItems } = useQuery<Item[]>({
     queryKey: ["/api/items"],
-    queryFn: () => apiRequest("GET", "/api/items").then(r => r.json()),
   });
 
   // Build a map: collectionId → items (from collection-detail caches already populated)

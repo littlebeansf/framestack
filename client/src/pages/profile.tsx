@@ -1,5 +1,4 @@
 import { useQuery } from "@tanstack/react-query";
-import { apiRequest } from "@/lib/queryClient";
 import { BarChart3 } from "lucide-react";
 import type { Item } from "@shared/schema";
 
@@ -17,7 +16,6 @@ const TYPE_COLORS: Record<string, string> = {
 export default function ProfilePage() {
   const { data: items } = useQuery<Item[]>({
     queryKey: ["/api/items"],
-    queryFn: () => apiRequest("GET", "/api/items").then(r => r.json()),
   });
 
   const total = (items || []).length;

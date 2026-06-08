@@ -1,6 +1,5 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { apiRequest } from "@/lib/queryClient";
 import type { Item } from "@shared/schema";
 import { MEDIA_TYPES, STATUSES } from "@shared/schema";
 import ItemCard from "@/components/ItemCard";
@@ -60,7 +59,6 @@ export default function LibraryPage() {
 
   const { data: items, isLoading } = useQuery<Item[]>({
     queryKey: ["/api/items"],
-    queryFn: () => apiRequest("GET", "/api/items").then(r => r.json()),
   });
 
   const filtered = (items || []).filter(item => {

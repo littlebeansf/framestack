@@ -34,12 +34,14 @@ export default function CollectionDetailPage() {
 
   const { data: items, isLoading } = useQuery<Item[]>({
     queryKey: ["/api/collections", id, "items"],
-    queryFn: async () => {
+    queryFn: async ({ queryKey }) => {
+      // Try backend; on failure return existing cache so data survives refresh
+      const cached = qc.getQueryData<Item[]>(queryKey as any) ?? [];
       try {
         const res = await apiRequest("GET", `/api/collections/${id}/items`);
         return await res.json();
       } catch {
-        return [];
+        return cached;
       }
     },
     enabled: !!id,
