@@ -63,32 +63,45 @@ export async function apiRequest(
 
 // ─── Default query function ───────────────────────────────────────────────────
 // For /api/items and /api/collections: if backend is unavailable, return local store.
+// On GitHub Pages (_isLocalhost === false), NEVER sync localStore from backend —
+// the backend returns empty arrays which would wipe persisted data.
 export const getQueryFn: <T>(options: { on401: "returnNull" | "throw" }) => QueryFunction<T> =
   ({ on401 }) =>
   async ({ queryKey }) => {
     const key = queryKey[0] as string;
     try {
       const res = await fetch(`${API_BASE}${key}`, { signal: AbortSignal.timeout(5000) });
-      console.log(`[QC] fetch ${API_BASE}${key} → status ${res.status}`);
 
       if (on401 === "returnNull" && res.status === 401) return null as T;
       await throwIfResNotOk(res);
 
       const data = await res.json();
       setBackendAvailable(true);
-      console.log(`[QC] backend OK for ${key}, syncing localStore`);
 
-      // Sync local store
-      if (key === "/api/items") localStore.replaceItems(data);
-      if (key === "/api/collections") localStore.replaceCollections(data);
+      // Only sync localStore from backend when running locally (real backend with real data).
+      // On GitHub Pages the backend returns empty arrays which would wipe persisted localStorage.
+      if (_isLocalhost) {
+        if (key === "/api/items") localStore.replaceItems(data);
+        if (key === "/api/collections") localStore.replaceCollections(data);
+        return data as T;
+      }
+
+      // On GitHub Pages: backend may return [] — prefer localStore if it has data
+      if (key === "/api/items") {
+        const local = localStore.getItems();
+        return (local.length > 0 ? local : data) as T;
+      }
+      if (key.startsWith("/api/collections") && !key.includes("/items")) {
+        const local = localStore.getCollections();
+        return (local.length > 0 ? local : data) as T;
+      }
 
       return data as T;
     } catch (e) {
-      console.warn(`[QC] backend OFFLINE for ${key}, falling back to localStore. Error:`, e);
       setBackendAvailable(false);
       // Fall back to local store
-      if (key === "/api/items") { const d = localStore.getItems(); console.log(`[QC] localStore items:`, d); return d as T; }
-      if (key.startsWith("/api/collections") && !key.includes("/items")) { const d = localStore.getCollections(); console.log(`[QC] localStore collections:`, d); return d as T; }
+      if (key === "/api/items") return localStore.getItems() as T;
+      if (key.startsWith("/api/collections") && !key.includes("/items")) return localStore.getCollections() as T;
       return [] as T;
     }
   };

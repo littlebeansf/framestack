@@ -14,11 +14,9 @@ const LS_NEXT_COL_ID_KEY = "framestack_next_col_id";
 function lsGet<T>(key: string, fallback: T): T {
   try {
     const raw = localStorage.getItem(key);
-    console.log(`[LS] get ${key}:`, raw ? JSON.parse(raw) : '(empty)');
     if (raw === null) return fallback;
     return JSON.parse(raw) as T;
-  } catch (e) {
-    console.warn(`[LS] get ${key} FAILED:`, e);
+  } catch {
     return fallback;
   }
 }
@@ -26,9 +24,8 @@ function lsGet<T>(key: string, fallback: T): T {
 function lsSet(key: string, value: unknown): void {
   try {
     localStorage.setItem(key, JSON.stringify(value));
-    console.log(`[LS] set ${key}:`, value);
-  } catch (e) {
-    console.warn(`[LS] set ${key} BLOCKED:`, e);
+  } catch {
+    // Blocked in sandboxed iframes — silent fallback to in-memory only
   }
 }
 
