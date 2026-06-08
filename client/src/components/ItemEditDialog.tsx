@@ -92,9 +92,10 @@ export default function ItemEditDialog({
       }
     },
     onSuccess: (updated: any) => {
-      qc.setQueryData<any[]>(["/api/items"], (old = []) =>
-        old.map(i => i.id === item.id ? { ...i, ...updated } : i)
-      );
+      const next = (qc.getQueryData<any[]>(["/api/items"]) ?? [])
+        .map(i => i.id === item.id ? { ...i, ...updated } : i);
+      qc.setQueryData(["/api/items"], next);
+      localStore.replaceItems(next);
       toast({ title: "Updated", description: item.title });
       onOpenChange(false);
     },

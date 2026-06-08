@@ -54,12 +54,12 @@ export default function ItemCard({ item, index = 0 }: { item: Item; index?: numb
     mutationFn: async () => {
       try {
         await apiRequest("DELETE", `/api/items/${item.id}`);
-      } catch {
-        localStore.deleteItem(item.id);
-      }
+      } catch { /* offline — handled in onSuccess */ }
     },
     onSuccess: () => {
-      qc.setQueryData<any[]>(["/api/items"], (old = []) => old.filter(i => i.id !== item.id));
+      const updated = (qc.getQueryData<any[]>(["/api/items"]) ?? []).filter(i => i.id !== item.id);
+      qc.setQueryData(["/api/items"], updated);
+      localStore.replaceItems(updated);
       toast({ title: "Removed from library", description: item.title });
     },
   });
@@ -75,9 +75,10 @@ export default function ItemCard({ item, index = 0 }: { item: Item; index?: numb
       }
     },
     onSuccess: (updated: any) => {
-      qc.setQueryData<any[]>(["/api/items"], (old = []) =>
-        old.map(i => i.id === item.id ? { ...i, ...updated } : i)
-      );
+      const next = (qc.getQueryData<any[]>(["/api/items"]) ?? [])
+        .map(i => i.id === item.id ? { ...i, ...updated } : i);
+      qc.setQueryData(["/api/items"], next);
+      localStore.replaceItems(next);
       toast({ title: STATUS_LABELS[updated.status], description: item.title });
     },
   });

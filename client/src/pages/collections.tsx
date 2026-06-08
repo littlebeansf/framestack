@@ -99,13 +99,16 @@ function CreateEditDialog({
       }
     },
     onSuccess: (result: any) => {
+      let updated: any[];
       if (existing) {
-        qc.setQueryData<any[]>(["/api/collections"], (old = []) =>
-          old.map(c => c.id === existing.id ? { ...c, ...result } : c)
-        );
+        updated = (qc.getQueryData<any[]>(["/api/collections"]) ?? [])
+          .map(c => c.id === existing.id ? { ...c, ...result } : c);
       } else {
-        qc.setQueryData<any[]>(["/api/collections"], (old = []) => [...old, result]);
+        updated = [...(qc.getQueryData<any[]>(["/api/collections"]) ?? []), result];
       }
+      qc.setQueryData(["/api/collections"], updated);
+      // Always sync localStorage so data survives refresh
+      localStore.replaceCollections(updated);
       toast({ title: existing ? "Collection updated" : "Collection created" });
       onOpenChange(false);
     },
@@ -197,13 +200,14 @@ export default function CollectionsPage() {
     mutationFn: async (id: number) => {
       try {
         await apiRequest("DELETE", `/api/collections/${id}`);
-      } catch {
-        localStore.deleteCollection(id);
-      }
+      } catch { /* offline — handled in onSuccess */ }
       return id;
     },
     onSuccess: (id: number) => {
-      qc.setQueryData<any[]>(["/api/collections"], (old = []) => old.filter(c => c.id !== id));
+      const updated = (qc.getQueryData<any[]>(["/api/collections"]) ?? []).filter(c => c.id !== id);
+      qc.setQueryData(["/api/collections"], updated);
+      // Always sync localStorage
+      localStore.replaceCollections(updated);
       toast({ title: "Collection deleted" });
     },
   });
