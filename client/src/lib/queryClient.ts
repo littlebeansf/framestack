@@ -69,23 +69,26 @@ export const getQueryFn: <T>(options: { on401: "returnNull" | "throw" }) => Quer
     const key = queryKey[0] as string;
     try {
       const res = await fetch(`${API_BASE}${key}`, { signal: AbortSignal.timeout(5000) });
+      console.log(`[QC] fetch ${API_BASE}${key} → status ${res.status}`);
 
       if (on401 === "returnNull" && res.status === 401) return null as T;
       await throwIfResNotOk(res);
 
       const data = await res.json();
       setBackendAvailable(true);
+      console.log(`[QC] backend OK for ${key}, syncing localStore`);
 
       // Sync local store
       if (key === "/api/items") localStore.replaceItems(data);
       if (key === "/api/collections") localStore.replaceCollections(data);
 
       return data as T;
-    } catch {
+    } catch (e) {
+      console.warn(`[QC] backend OFFLINE for ${key}, falling back to localStore. Error:`, e);
       setBackendAvailable(false);
       // Fall back to local store
-      if (key === "/api/items") return localStore.getItems() as T;
-      if (key.startsWith("/api/collections") && !key.includes("/items")) return localStore.getCollections() as T;
+      if (key === "/api/items") { const d = localStore.getItems(); console.log(`[QC] localStore items:`, d); return d as T; }
+      if (key.startsWith("/api/collections") && !key.includes("/items")) { const d = localStore.getCollections(); console.log(`[QC] localStore collections:`, d); return d as T; }
       return [] as T;
     }
   };
