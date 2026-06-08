@@ -1,6 +1,7 @@
 import { useRoute, useLocation } from "wouter";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
+import { localStore } from "@/lib/localStore";
 import type { Collection, Item } from "@shared/schema";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
@@ -34,14 +35,16 @@ export default function CollectionDetailPage() {
 
   const { data: items, isLoading } = useQuery<Item[]>({
     queryKey: ["/api/collections", id, "items"],
-    queryFn: async ({ queryKey }) => {
-      // Try backend; on failure return existing cache so data survives refresh
-      const cached = qc.getQueryData<Item[]>(queryKey as any) ?? [];
+    queryFn: async () => {
       try {
         const res = await apiRequest("GET", `/api/collections/${id}/items`);
-        return await res.json();
+        const data: Item[] = await res.json();
+        // Sync membership to localStore so it survives refresh
+        data.forEach(i => localStore.addItemToCollection(id, i.id));
+        return data;
       } catch {
-        return cached;
+        // Backend offline — return persisted membership from localStore
+        return localStore.getCollectionItems(id);
       }
     },
     enabled: !!id,
@@ -58,6 +61,7 @@ export default function CollectionDetailPage() {
       qc.setQueryData<any[]>(["/api/collections", id, "items"], (old = []) =>
         old.filter(i => i.id !== itemId)
       );
+      localStore.removeItemFromCollection(id, itemId);
       toast({ title: "Removed from collection" });
     },
   });

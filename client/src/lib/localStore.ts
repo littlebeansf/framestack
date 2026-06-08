@@ -98,6 +98,35 @@ export const localStore = {
     saveCols();
   },
 
+  // ── Collection items (membership) ──────────────────────────────────────────
+
+  /** Returns full Item objects belonging to a collection. */
+  getCollectionItems(colId: number): Item[] {
+    const ids = _colItems[colId] ?? [];
+    return ids.map(id => _items.find(i => i.id === id)).filter(Boolean) as Item[];
+  },
+
+  /** Returns collection IDs that contain the given item. */
+  getItemCollectionIds(itemId: number): number[] {
+    return Object.entries(_colItems)
+      .filter(([, ids]) => ids.includes(itemId))
+      .map(([colId]) => Number(colId));
+  },
+
+  addItemToCollection(colId: number, itemId: number): void {
+    if (!_colItems[colId]) _colItems[colId] = [];
+    if (!_colItems[colId].includes(itemId)) {
+      _colItems[colId] = [..._colItems[colId], itemId];
+      saveColItems();
+    }
+  },
+
+  removeItemFromCollection(colId: number, itemId: number): void {
+    if (!_colItems[colId]) return;
+    _colItems[colId] = _colItems[colId].filter(id => id !== itemId);
+    saveColItems();
+  },
+
   // ── Utility: check if item exists by externalId ───────────────────────────
   hasExternalId(externalId: string, externalSource: string): boolean {
     return _items.some(i => i.externalId === externalId && i.externalSource === externalSource);

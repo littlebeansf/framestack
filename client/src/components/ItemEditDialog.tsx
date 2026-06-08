@@ -71,13 +71,16 @@ export default function ItemEditDialog({
   // Track which collections this item belongs to — in local state so we can update instantly
   const [itemColIds, setItemColIds] = useState<Set<number>>(new Set());
 
-  // Populate from backend when dialog opens
+  // Populate from backend when dialog opens; fall back to localStore
   useEffect(() => {
     if (!open) return;
     apiRequest("GET", `/api/items/${item.id}/collections`)
       .then(r => r.json())
       .then((cols: Collection[]) => setItemColIds(new Set(cols.map(c => c.id))))
-      .catch(() => setItemColIds(new Set()));
+      .catch(() => {
+        // Backend offline — read membership from localStore
+        setItemColIds(new Set(localStore.getItemCollectionIds(item.id)));
+      });
   }, [open, item.id]);
 
 
@@ -110,7 +113,9 @@ export default function ItemEditDialog({
     },
     onSuccess: (collectionId: number) => {
       setItemColIds(prev => new Set([...prev, collectionId]));
-      // Also update collection-detail cache if open
+      // Persist membership to localStore so it survives refresh
+      localStore.addItemToCollection(collectionId, item.id);
+      // Also update collection-detail cache if already open
       qc.setQueryData<any[]>(["/api/collections", collectionId, "items"], (old = []) => {
         if (old.some(i => i.id === item.id)) return old;
         return [...old, item];
@@ -128,6 +133,8 @@ export default function ItemEditDialog({
     },
     onSuccess: (collectionId: number) => {
       setItemColIds(prev => { const s = new Set(prev); s.delete(collectionId); return s; });
+      // Persist removal to localStore
+      localStore.removeItemFromCollection(collectionId, item.id);
       qc.setQueryData<any[]>(["/api/collections", collectionId, "items"], (old = []) =>
         old.filter(i => i.id !== item.id)
       );
