@@ -8,6 +8,8 @@ const LS_ITEMS_KEY = "framestack_items";
 const LS_COLLECTIONS_KEY = "framestack_collections";
 const LS_NEXT_ITEM_ID_KEY = "framestack_next_item_id";
 const LS_NEXT_COL_ID_KEY = "framestack_next_col_id";
+// Map of collectionId → itemId[] (tracks which items belong to which collection)
+const LS_COL_ITEMS_KEY = "framestack_col_items";
 
 // ── Persistence helpers ──────────────────────────────────────────────────────
 
@@ -35,9 +37,12 @@ let _items: Item[] = lsGet<Item[]>(LS_ITEMS_KEY, []);
 let _collections: Collection[] = lsGet<Collection[]>(LS_COLLECTIONS_KEY, []);
 let _nextItemId = lsGet<number>(LS_NEXT_ITEM_ID_KEY, 1_000_000);
 let _nextColId = lsGet<number>(LS_NEXT_COL_ID_KEY, 1_000_000);
+// colId → itemId[] membership map
+let _colItems: Record<number, number[]> = lsGet<Record<number, number[]>>(LS_COL_ITEMS_KEY, {});
 
 function saveItems() { lsSet(LS_ITEMS_KEY, _items); lsSet(LS_NEXT_ITEM_ID_KEY, _nextItemId); }
 function saveCols() { lsSet(LS_COLLECTIONS_KEY, _collections); lsSet(LS_NEXT_COL_ID_KEY, _nextColId); }
+function saveColItems() { lsSet(LS_COL_ITEMS_KEY, _colItems); }
 
 // ── Store API ────────────────────────────────────────────────────────────────
 
