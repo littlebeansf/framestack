@@ -136,4 +136,38 @@ export const localStore = {
   hasExternalId(externalId: string, externalSource: string): boolean {
     return _items.some(i => i.externalId === externalId && i.externalSource === externalSource);
   },
+
+  // ── Import / Export ───────────────────────────────────────────────────────
+
+  /** Returns a full snapshot of all data for export. */
+  exportAll() {
+    return {
+      version: 1,
+      exportedAt: new Date().toISOString(),
+      items: [..._items],
+      collections: [..._collections],
+      colItems: { ..._colItems },
+      _nextItemId,
+      _nextColId,
+    };
+  },
+
+  /** Replaces the entire store with imported data. */
+  importAll(data: ReturnType<typeof localStore.exportAll>): void {
+    _items = [...(data.items ?? [])];
+    _collections = [...(data.collections ?? [])];
+    _colItems = { ...(data.colItems ?? {}) };
+    // Use max of imported IDs + 1 to avoid collisions, or imported counter
+    _nextItemId = data._nextItemId ?? (_items.reduce((m, i) => Math.max(m, i.id), 0) + 1);
+    _nextColId = data._nextColId ?? (_collections.reduce((m, c) => Math.max(m, c.id), 0) + 1);
+    saveItems();
+    saveCols();
+    saveColItems();
+  },
+
+  /** Replace the colItems map (used after import). */
+  replaceColItems(map: Record<number, number[]>): void {
+    _colItems = { ...map };
+    saveColItems();
+  },
 };

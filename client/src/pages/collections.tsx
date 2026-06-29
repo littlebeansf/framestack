@@ -181,19 +181,21 @@ export default function CollectionsPage() {
     queryKey: ["/api/items"],
   });
 
-  // Build a map: collectionId → items (from collection-detail caches already populated)
-  // Since we can't guarantee they're all fetched, we fall back to an empty array
+  // Read covers and counts from localStore — works after page refresh
+  // (React Query cache is empty on reload, but localStore has the data)
   function getCollectionCovers(colId: number): string[] {
-    const cached = qc.getQueryData<Item[]>(["/api/collections", colId, "items"]) ?? [];
-    return cached
+    // Prefer RQ cache if already loaded (e.g. user visited detail page this session)
+    const cached = qc.getQueryData<Item[]>(["/api/collections", colId, "items"]);
+    const source = cached ?? localStore.getCollectionItems(colId);
+    return source
       .filter(i => !!i.coverUrl)
       .map(i => i.coverUrl!)
       .slice(0, 4);
   }
 
-  function getCollectionCount(colId: number): number | null {
+  function getCollectionCount(colId: number): number {
     const cached = qc.getQueryData<Item[]>(["/api/collections", colId, "items"]);
-    return cached ? cached.length : null;
+    return cached ? cached.length : localStore.getCollectionItems(colId).length;
   }
 
   const deleteMutation = useMutation({
@@ -285,12 +287,10 @@ export default function CollectionsPage() {
                         {col.description && (
                           <p className="text-xs text-muted-foreground line-clamp-2 leading-relaxed">{col.description}</p>
                         )}
-                        {count !== null && (
-                          <p className="text-[10px] text-muted-foreground/60 mt-2 flex items-center gap-1">
-                            <Layers size={9} />
-                            {count} item{count !== 1 ? "s" : ""}
-                          </p>
-                        )}
+                        <p className="text-[10px] text-muted-foreground/60 mt-2 flex items-center gap-1">
+                          <Layers size={9} />
+                          {count} item{count !== 1 ? "s" : ""}
+                        </p>
                       </div>
 
                       {/* Actions */}
