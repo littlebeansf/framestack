@@ -66,36 +66,24 @@ async function searchManga(q: string): Promise<SearchResult[]> {
 }
 
 // ── Movies (OMDb) ─────────────────────────────────────────────────────────────
-// Fetches pages 1 and 2 in parallel for wider coverage (~20 results)
 
 async function searchMovies(q: string): Promise<SearchResult[]> {
-  async function fetchPage(page: number): Promise<SearchResult[]> {
-    try {
-      const r = await fetch(
-        `https://www.omdbapi.com/?s=${encodeURIComponent(q)}&type=movie&page=${page}&apikey=${OMDB_KEY}`
-      );
-      if (!r.ok) return [];
-      const data = await r.json();
-      if (data.Error) return [];
-      return (data.Search || []).map((m: any) => ({
-        externalId: m.imdbID,
-        externalSource: "omdb",
-        title: m.Title,
-        coverUrl: m.Poster !== "N/A" ? m.Poster : undefined,
-        year: m.Year?.slice(0, 4),
-        mediaType: "movie" as const,
-      }));
-    } catch { return []; }
-  }
-
-  const [p1, p2] = await Promise.all([fetchPage(1), fetchPage(2)]);
-  // Deduplicate by imdbID
-  const seen = new Set<string>();
-  return [...p1, ...p2].filter(r => {
-    if (seen.has(r.externalId)) return false;
-    seen.add(r.externalId);
-    return true;
-  });
+  try {
+    const r = await fetch(
+      `https://www.omdbapi.com/?s=${encodeURIComponent(q)}&type=movie&page=1&apikey=${OMDB_KEY}`
+    );
+    if (!r.ok) return [];
+    const data = await r.json();
+    if (data.Error) return [];
+    return (data.Search || []).map((m: any) => ({
+      externalId: m.imdbID,
+      externalSource: "omdb",
+      title: m.Title,
+      coverUrl: m.Poster !== "N/A" ? m.Poster : undefined,
+      year: m.Year?.slice(0, 4),
+      mediaType: "movie" as const,
+    }));
+  } catch { return []; }
 }
 
 // ── Series (TVmaze) ───────────────────────────────────────────────────────────

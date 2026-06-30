@@ -39,7 +39,8 @@ export default function SearchDialog({
   onOpenChange: (v: boolean) => void;
 }) {
   const [query, setQuery] = useState("");
-  const [filterType, setFilterType] = useState<string>("all");
+  // Category is mandatory — default to anime, user must pick before results appear
+  const [filterType, setFilterType] = useState<string>("anime");
   const [results, setResults] = useState<SearchResult[]>([]);
   const [loading, setLoading] = useState(false);
   // Track state per result: null = idle, "adding" = in flight, "added" = done
@@ -65,15 +66,14 @@ export default function SearchDialog({
     debounceRef.current = setTimeout(async () => {
       setLoading(true);
       try {
-        const type = filterType !== "all" ? filterType : undefined;
-        const data = await searchAll(query, type);
+        const data = await searchAll(query, filterType);
         setResults(data);
       } catch {
         setResults([]);
       } finally {
         setLoading(false);
       }
-    }, 500);
+    }, 600);
     return () => clearTimeout(debounceRef.current);
   }, [query, filterType]);
 
@@ -124,9 +124,8 @@ export default function SearchDialog({
     // Don't close the dialog — user can keep adding
   }
 
-  const filteredResults = filterType === "all"
-    ? results
-    : results.filter(r => r.mediaType === filterType);
+  // Results are already filtered by type (searchAll only queries the selected source)
+  const filteredResults = results;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -148,12 +147,11 @@ export default function SearchDialog({
               onChange={e => setQuery(e.target.value)}
             />
           </div>
-          <Select value={filterType} onValueChange={setFilterType}>
+          <Select value={filterType} onValueChange={v => { setFilterType(v); setResults([]); }}>
             <SelectTrigger className="w-32 shrink-0" data-testid="select-search-type">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">All types</SelectItem>
               {MEDIA_TYPES.map(t => (
                 <SelectItem key={t} value={t}>{TYPE_LABELS[t]}</SelectItem>
               ))}
@@ -181,8 +179,8 @@ export default function SearchDialog({
           {!loading && !query && (
             <div className="flex flex-col items-center justify-center py-12 text-center text-muted-foreground">
               <Search size={32} className="mb-3 opacity-30" />
-              <p className="text-sm">Type to search across all media</p>
-              <p className="text-xs mt-1">Anime · Manga · Movies · Series · Books</p>
+              <p className="text-sm">Search {TYPE_LABELS[filterType] ?? "media"}</p>
+              <p className="text-xs mt-1">Select a category, then type to search</p>
             </div>
           )}
 
