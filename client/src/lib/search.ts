@@ -1,9 +1,9 @@
 // Direct browser-side search — no backend required.
 // Sources:
-//   Anime/Manga : Jikan (MAL) — https://jikan.moe
-//   Movies      : OMDb         — https://www.omdbapi.com  (key required, free tier)
-//   Series      : TVmaze       — https://api.tvmaze.com   (free, no auth)
-//   Books       : Open Library — https://openlibrary.org
+//   Anime/Manga : Jikan (MAL)    — https://jikan.moe          (free, no key)
+//   Movies      : FM-DB / IMDbOT — https://imdb.iamidiotareyoutoo.com (free, no key)
+//   Series      : TVmaze         — https://api.tvmaze.com      (free, no key)
+//   Books       : Open Library   — https://openlibrary.org     (free, no key)
 
 export interface SearchResult {
   externalId: string;
@@ -17,8 +17,6 @@ export interface SearchResult {
   studio?: string;
   episodes?: number;
 }
-
-const OMDB_KEY = "2b7a22dd";
 
 // ── Anime ─────────────────────────────────────────────────────────────────────
 
@@ -65,23 +63,25 @@ async function searchManga(q: string): Promise<SearchResult[]> {
   } catch { return []; }
 }
 
-// ── Movies (OMDb) ─────────────────────────────────────────────────────────────
+// ── Movies (FM-DB — free IMDb mirror, no key) ──────────────────────────────
 
 async function searchMovies(q: string): Promise<SearchResult[]> {
   try {
     const r = await fetch(
-      `https://www.omdbapi.com/?s=${encodeURIComponent(q)}&type=movie&page=1&apikey=${OMDB_KEY}`
+      `https://imdb.iamidiotareyoutoo.com/search?q=${encodeURIComponent(q)}`,
+      { signal: AbortSignal.timeout(8000) }
     );
     if (!r.ok) return [];
     const data = await r.json();
-    if (data.Error) return [];
-    return (data.Search || []).map((m: any) => ({
-      externalId: m.imdbID,
-      externalSource: "omdb",
-      title: m.Title,
-      coverUrl: m.Poster !== "N/A" ? m.Poster : undefined,
-      year: m.Year?.slice(0, 4),
+    if (!data.ok || !Array.isArray(data.description)) return [];
+    return data.description.slice(0, 12).map((m: any) => ({
+      externalId: m["#IMDB_ID"],
+      externalSource: "imdb",
+      title: m["#TITLE"],
+      coverUrl: m["#IMG_POSTER"] || undefined,
+      year: m["#YEAR"] ? String(m["#YEAR"]) : undefined,
       mediaType: "movie" as const,
+      studio: m["#ACTORS"] ? m["#ACTORS"].split(", ").slice(0, 2).join(", ") : undefined,
     }));
   } catch { return []; }
 }
