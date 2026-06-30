@@ -33,6 +33,26 @@ const STATUS_COLORS: Record<string, string> = {
   wishlist:  "hsl(220 8% 55%)",
 };
 
+// Left-border accent + cover overlay per status
+const STATUS_BORDER: Record<string, string> = {
+  completed:  "hsl(160 65% 50%)",
+  watching:   "hsl(190 75% 55%)",
+  reading:    "hsl(255 75% 70%)",
+  on_hold:    "hsl(30 85% 65%)",
+  dropped:    "hsl(0 65% 60%)",
+  wishlist:   "transparent",
+};
+
+// Cover overlay tint for not-started / hold / dropped — dims the cover slightly
+const STATUS_OVERLAY: Record<string, string | null> = {
+  completed:  null,
+  watching:   null,
+  reading:    null,
+  on_hold:    "rgba(30,30,60,0.35)",
+  dropped:    "rgba(60,10,10,0.40)",
+  wishlist:   "rgba(0,0,0,0.25)",
+};
+
 const STATUS_LABELS: Record<string, string> = {
   watching:  "Watching",
   reading:   "Reading",
@@ -91,7 +111,9 @@ export default function ItemCard({ item, index = 0 }: { item: Item; index?: numb
   }
 
   const Icon = TYPE_ICONS[item.mediaType] || Star;
-  const statusColor = STATUS_COLORS[item.status] || STATUS_COLORS.wishlist;
+  const statusColor  = STATUS_COLORS[item.status]  || STATUS_COLORS.wishlist;
+  const statusBorder = STATUS_BORDER[item.status]  || "transparent";
+  const statusOverlay = STATUS_OVERLAY[item.status] ?? null;
 
   return (
     <>
@@ -99,10 +121,15 @@ export default function ItemCard({ item, index = 0 }: { item: Item; index?: numb
         data-testid={`card-item-${item.id}`}
         className="group relative rounded-lg overflow-hidden bg-card border border-border cursor-pointer
           transition-all duration-300
-          hover:border-primary/30 hover:shadow-xl hover:shadow-black/30
+          hover:shadow-xl hover:shadow-black/30
           hover:-translate-y-0.5
           animate-card-in"
-        style={{ animationDelay: `${index * 40}ms`, animationFillMode: "both" }}
+        style={{
+          animationDelay: `${index * 40}ms`,
+          animationFillMode: "both",
+          borderLeftColor: statusBorder,
+          borderLeftWidth: statusBorder !== "transparent" ? "3px" : "1px",
+        }}
         onClick={() => setEditOpen(true)}
       >
         {/* Cover */}
@@ -121,6 +148,11 @@ export default function ItemCard({ item, index = 0 }: { item: Item; index?: numb
             <div className="absolute inset-0 flex items-center justify-center bg-secondary">
               <Icon size={28} className="text-muted-foreground/30" />
             </div>
+          )}
+
+          {/* Status overlay tint (dims not-started / on-hold / dropped) */}
+          {statusOverlay && (
+            <div className="absolute inset-0 pointer-events-none" style={{ backgroundColor: statusOverlay }} />
           )}
 
           {/* Bottom gradient overlay */}
