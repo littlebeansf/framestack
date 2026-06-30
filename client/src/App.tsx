@@ -1,13 +1,16 @@
+import { useState, useEffect } from "react";
 import { Switch, Route, Router } from "wouter";
 import { useHashLocation } from "wouter/use-hash-location";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { queryClient } from "@/lib/queryClient";
 import { Toaster } from "@/components/ui/toaster";
+import { isAuthenticated } from "@/lib/auth";
 
 import LibraryPage from "@/pages/library";
 import CollectionsPage from "@/pages/collections";
 import CollectionDetailPage from "@/pages/collection-detail";
 import ProfilePage from "@/pages/profile";
+import LoginPage from "@/pages/login";
 import NotFound from "@/pages/not-found";
 import AppShell from "@/components/AppShell";
 
@@ -22,6 +25,25 @@ export function LogoIcon({ size = 24 }: { size?: number }) {
 }
 
 export default function App() {
+  const [authed, setAuthed] = useState<boolean | null>(null);
+
+  // Check auth on mount (sync from localStorage)
+  useEffect(() => {
+    setAuthed(isAuthenticated());
+  }, []);
+
+  // Still checking
+  if (authed === null) return null;
+
+  if (!authed) {
+    return (
+      <QueryClientProvider client={queryClient}>
+        <LoginPage onSuccess={() => setAuthed(true)} />
+        <Toaster />
+      </QueryClientProvider>
+    );
+  }
+
   return (
     <QueryClientProvider client={queryClient}>
       <Router hook={useHashLocation}>
