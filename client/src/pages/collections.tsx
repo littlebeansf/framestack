@@ -99,16 +99,16 @@ function CreateEditDialog({
       }
     },
     onSuccess: (result: any) => {
+      // Source from localStore — RQ cache may be empty/stale
       let updated: any[];
       if (existing) {
-        updated = (qc.getQueryData<any[]>(["/api/collections"]) ?? [])
-          .map(c => c.id === existing.id ? { ...c, ...result } : c);
+        updated = localStore.getCollections().map(c => c.id === existing.id ? { ...c, ...result } : c);
       } else {
-        updated = [...(qc.getQueryData<any[]>(["/api/collections"]) ?? []), result];
+        // addCollection already persisted; just read back the full list
+        updated = localStore.getCollections();
       }
-      qc.setQueryData(["/api/collections"], updated);
-      // Always sync localStorage so data survives refresh
       localStore.replaceCollections(updated);
+      qc.setQueryData(["/api/collections"], updated);
       toast({ title: existing ? "Collection updated" : "Collection created" });
       onOpenChange(false);
     },
@@ -206,10 +206,10 @@ export default function CollectionsPage() {
       return id;
     },
     onSuccess: (id: number) => {
-      const updated = (qc.getQueryData<any[]>(["/api/collections"]) ?? []).filter(c => c.id !== id);
-      qc.setQueryData(["/api/collections"], updated);
-      // Always sync localStorage
+      // Source from localStore — RQ cache may be empty/stale
+      const updated = localStore.getCollections().filter(c => c.id !== id);
       localStore.replaceCollections(updated);
+      qc.setQueryData(["/api/collections"], updated);
       toast({ title: "Collection deleted" });
     },
   });

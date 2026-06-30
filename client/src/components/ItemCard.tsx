@@ -77,9 +77,11 @@ export default function ItemCard({ item, index = 0 }: { item: Item; index?: numb
       } catch { /* offline — handled in onSuccess */ }
     },
     onSuccess: () => {
-      const updated = (qc.getQueryData<any[]>(["/api/items"]) ?? []).filter(i => i.id !== item.id);
-      qc.setQueryData(["/api/items"], updated);
+      // Always source from localStore — RQ cache may be empty if user hasn't
+      // visited the library page yet this session (e.g. navigated straight to collection detail)
+      const updated = localStore.getItems().filter(i => i.id !== item.id);
       localStore.replaceItems(updated);
+      qc.setQueryData(["/api/items"], updated);
       toast({ title: "Removed from library", description: item.title });
     },
   });
@@ -95,10 +97,10 @@ export default function ItemCard({ item, index = 0 }: { item: Item; index?: numb
       }
     },
     onSuccess: (updated: any) => {
-      const next = (qc.getQueryData<any[]>(["/api/items"]) ?? [])
-        .map(i => i.id === item.id ? { ...i, ...updated } : i);
-      qc.setQueryData(["/api/items"], next);
+      // Source from localStore to avoid stale/empty RQ cache overwriting persisted data
+      const next = localStore.getItems().map(i => i.id === item.id ? { ...i, ...updated } : i);
       localStore.replaceItems(next);
+      qc.setQueryData(["/api/items"], next);
       toast({ title: STATUS_LABELS[updated.status], description: item.title });
     },
   });

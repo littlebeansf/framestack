@@ -110,14 +110,14 @@ export default function SearchDialog({
     try {
       const res = await apiRequest("POST", "/api/items", payload);
       const newItem = await res.json();
-      const next = [...(qc.getQueryData<any[]>(["/api/items"]) ?? []), newItem];
-      qc.setQueryData(["/api/items"], next);
+      // Always source from localStore — RQ cache may be empty/stale
+      const next = [...localStore.getItems().filter(i => i.id !== newItem.id), newItem];
       localStore.replaceItems(next);
+      qc.setQueryData(["/api/items"], next);
     } catch {
       const localItem = localStore.addItem(payload);
-      const next = [...(qc.getQueryData<any[]>(["/api/items"]) ?? []), localItem];
-      qc.setQueryData(["/api/items"], next);
-      // localStore.addItem already persisted to localStorage
+      // localStore.addItem already persisted; sync RQ cache from localStore
+      qc.setQueryData(["/api/items"], localStore.getItems());
     }
     setItemStates(s => ({ ...s, [key]: "added" }));
     toast({ title: "Added to library", description: result.title });
