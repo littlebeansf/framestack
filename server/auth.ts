@@ -1,7 +1,7 @@
 import jwt from "jsonwebtoken";
 import type { Request, Response, NextFunction } from "express";
 
-const JWT_SECRET = "framestack-jwt-secret-2024-secure";
+const JWT_SECRET = process.env.JWT_SECRET || "framestack-jwt-secret-change-me";
 const JWT_EXPIRES = "30d";
 
 export function signToken(userId: number): string {

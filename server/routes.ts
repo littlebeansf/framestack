@@ -235,6 +235,54 @@ export async function registerRoutes(httpServer: Server, app: Express) {
     }
   });
 
+
+  app.get("/api/search/movie", async (req, res) => {
+    try {
+      const { q } = req.query;
+      const url = `https://imdb.iamidiotareyoutoo.com/search?q=${encodeURIComponent(String(q))}`;
+      const r = await (fetch as any)(url, { signal: AbortSignal.timeout(8000) });
+      if (!r.ok) return res.json([]);
+      const data = await r.json() as any;
+      if (!data.ok || !Array.isArray(data.description)) return res.json([]);
+      const results = data.description.slice(0, 12).map((m: any) => ({
+        externalId: m["#IMDB_ID"],
+        externalSource: "imdb",
+        title: m["#TITLE"],
+        coverUrl: m["#IMG_POSTER"] || null,
+        year: m["#YEAR"] ? String(m["#YEAR"]) : null,
+        mediaType: "movie",
+        studio: m["#ACTORS"] ? m["#ACTORS"].split(", ").slice(0, 2).join(", ") : null,
+      }));
+      res.json(results);
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  app.get("/api/search/series", async (req, res) => {
+    try {
+      const { q } = req.query;
+      const url = `https://api.tvmaze.com/search/shows?q=${encodeURIComponent(String(q))}`;
+      const r = await (fetch as any)(url);
+      if (!r.ok) return res.json([]);
+      const data = await r.json() as any[];
+      const results = data.slice(0, 12).map(({ show }: any) => ({
+        externalId: String(show.id),
+        externalSource: "tvmaze",
+        title: show.name,
+        coverUrl: show.image?.medium || show.image?.original || null,
+        year: show.premiered?.slice(0, 4) || null,
+        mediaType: "series",
+        genres: show.genres?.length ? JSON.stringify(show.genres) : null,
+        studio: show.network?.name || show.webChannel?.name || null,
+        episodes: show.runtime ?? null,
+      }));
+      res.json(results);
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
   app.get("/api/search/books", async (req, res) => {
     try {
       const { q } = req.query;
