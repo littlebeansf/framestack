@@ -1,5 +1,3 @@
-import { drizzle } from "drizzle-orm/better-sqlite3";
-import Database from "better-sqlite3";
 import { eq, and, desc } from "drizzle-orm";
 import {
   users, items, collections, collectionItems,
@@ -8,9 +6,10 @@ import {
   type Collection, type InsertCollection,
   type CollectionItem, type InsertCollectionItem,
 } from "@shared/schema";
+import { getDb, getDrizzle } from "./db";
 
-const sqlite = new Database("data.db");
-const db = drizzle(sqlite);
+const sqlite = getDb();
+const db = getDrizzle();
 
 // ─── Migrations ──────────────────────────────────────────────────────────────
 
