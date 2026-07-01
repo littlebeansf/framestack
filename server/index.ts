@@ -5,6 +5,13 @@ import { registerRoutes } from "./routes";
 import { serveStatic } from "./static";
 import { createServer } from "node:http";
 
+// Allow the GitHub Pages frontend (and localhost dev) to call the API
+const ALLOWED_ORIGINS = [
+  "https://littlebeansf.github.io",
+  "http://localhost:5173",
+  "http://localhost:5000",
+];
+
 const app = express();
 const httpServer = createServer(app);
 
@@ -13,6 +20,19 @@ declare module "http" {
     rawBody: unknown;
   }
 }
+
+// CORS — must be before other middleware
+app.use((req, res, next) => {
+  const origin = req.headers.origin || "";
+  if (ALLOWED_ORIGINS.includes(origin)) {
+    res.setHeader("Access-Control-Allow-Origin", origin);
+    res.setHeader("Access-Control-Allow-Credentials", "true");
+  }
+  res.setHeader("Access-Control-Allow-Methods", "GET,POST,PATCH,DELETE,OPTIONS");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
+  if (req.method === "OPTIONS") return res.sendStatus(204);
+  next();
+});
 
 app.use(
   express.json({

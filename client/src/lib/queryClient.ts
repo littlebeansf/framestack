@@ -1,12 +1,16 @@
 import { QueryClient, QueryFunction } from "@tanstack/react-query";
 import { localStore } from "./localStore";
 
-// Runtime API base detection.
-// localhost/127.0.0.1 → Vite dev server proxies /api → Express.
-// Any other host (Perplexity sandbox, GitHub Pages, etc.) → /port/5000 proxy.
+// API base resolution order:
+//  1. VITE_API_URL build-time env var (set when building for production → Railway URL)
+//  2. localhost dev → empty string (Vite proxy handles /api → Express)
+//  3. Any other host without env var → empty string (Railway serves frontend too)
 const _hostname = typeof window !== "undefined" ? window.location.hostname : "localhost";
-const _isLocalhost = _hostname === "localhost" || _hostname === "127.0.0.1";
-export const API_BASE = _isLocalhost ? "" : "/port/5000";
+export const _isLocalhost = _hostname === "localhost" || _hostname === "127.0.0.1";
+
+// injected at build time via vite define; empty string = same-origin
+const _envApiUrl: string = (import.meta as any).env?.VITE_API_URL ?? "";
+export const API_BASE: string = _envApiUrl || "";
 
 // ─── Backend availability ─────────────────────────────────────────────────────
 // We ping once on load. If unreachable, all mutations fall back to localStore.
