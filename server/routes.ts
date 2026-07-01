@@ -127,6 +127,45 @@ export async function registerRoutes(httpServer: Server, app: Express) {
     }
   });
 
+  // ─── Bulk import (localStorage → backend migration) ───────────────────────
+  // Called once on first load when backend is empty but localStorage has data.
+  app.post("/api/import", (req, res) => {
+    try {
+      const { items: importItems = [], collections: importCollections = [], colItems = {} } = req.body;
+
+      const itemIdMap: Record<number, number> = {};
+      const colIdMap: Record<number, number> = {};
+
+      for (const item of importItems) {
+        const { id: oldId, userId: _u, ...rest } = item;
+        const created = storage.createItem({ ...rest, userId: USER_ID });
+        itemIdMap[oldId] = created.id;
+      }
+
+      for (const col of importCollections) {
+        const { id: oldId, userId: _u, ...rest } = col;
+        const created = storage.createCollection({ ...rest, userId: USER_ID });
+        colIdMap[oldId] = created.id;
+      }
+
+      for (const [oldColId, oldItemIds] of Object.entries(colItems)) {
+        const newColId = colIdMap[Number(oldColId)];
+        if (!newColId) continue;
+        for (const oldItemId of oldItemIds as number[]) {
+          const newItemId = itemIdMap[oldItemId];
+          if (!newItemId) continue;
+          try {
+            storage.addItemToCollection({ collectionId: newColId, itemId: newItemId });
+          } catch { /* skip duplicates */ }
+        }
+      }
+
+      res.json({ ok: true, itemIdMap, colIdMap });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
   // ─── External Search ───────────────────────────────────────────────────────
 
   app.get("/api/search/anime", async (req, res) => {
