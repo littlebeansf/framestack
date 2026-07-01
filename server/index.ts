@@ -5,13 +5,6 @@ import { registerRoutes } from "./routes";
 import { serveStatic } from "./static";
 import { createServer } from "node:http";
 
-// Allow the GitHub Pages frontend (and localhost dev) to call the API
-const ALLOWED_ORIGINS = [
-  "https://littlebeansf.github.io",
-  "http://localhost:5173",
-  "http://localhost:5000",
-];
-
 const app = express();
 const httpServer = createServer(app);
 
@@ -20,19 +13,6 @@ declare module "http" {
     rawBody: unknown;
   }
 }
-
-// CORS — must be before other middleware
-app.use((req, res, next) => {
-  const origin = req.headers.origin || "";
-  if (ALLOWED_ORIGINS.includes(origin)) {
-    res.setHeader("Access-Control-Allow-Origin", origin);
-    res.setHeader("Access-Control-Allow-Credentials", "true");
-  }
-  res.setHeader("Access-Control-Allow-Methods", "GET,POST,PATCH,DELETE,OPTIONS");
-  res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
-  if (req.method === "OPTIONS") return res.sendStatus(204);
-  next();
-});
 
 app.use(
   express.json({
@@ -51,7 +31,6 @@ export function log(message: string, source = "express") {
     second: "2-digit",
     hour12: true,
   });
-
   console.log(`${formattedTime} [${source}] ${message}`);
 }
 
@@ -73,7 +52,6 @@ app.use((req, res, next) => {
       if (capturedJsonResponse) {
         logLine += ` :: ${JSON.stringify(capturedJsonResponse)}`;
       }
-
       log(logLine);
     }
   });
@@ -87,19 +65,11 @@ app.use((req, res, next) => {
   app.use((err: any, _req: Request, res: Response, next: NextFunction) => {
     const status = err.status || err.statusCode || 500;
     const message = err.message || "Internal Server Error";
-
     console.error("Internal Server Error:", err);
-
-    if (res.headersSent) {
-      return next(err);
-    }
-
+    if (res.headersSent) return next(err);
     return res.status(status).json({ message });
   });
 
-  // importantly only setup vite in development and after
-  // setting up all the other routes so the catch-all route
-  // doesn't interfere with the other routes
   if (process.env.NODE_ENV === "production") {
     serveStatic(app);
   } else {
@@ -107,19 +77,9 @@ app.use((req, res, next) => {
     await setupVite(httpServer, app);
   }
 
-  // ALWAYS serve the app on the port specified in the environment variable PORT
-  // Other ports are firewalled. Default to 5000 if not specified.
-  // this serves both the API and the client.
-  // It is the only port that is not firewalled.
   const port = parseInt(process.env.PORT || "5000", 10);
   httpServer.listen(
-    {
-      port,
-      host: "0.0.0.0",
-      reusePort: true,
-    },
-    () => {
-      log(`serving on port ${port}`);
-    },
+    { port, host: "0.0.0.0", reusePort: true },
+    () => { log(`serving on port ${port}`); },
   );
 })();

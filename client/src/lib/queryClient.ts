@@ -1,34 +1,12 @@
 import { QueryClient, QueryFunction } from "@tanstack/react-query";
 import { localStore } from "./localStore";
 
-// API base resolution order:
-//  1. VITE_API_URL build-time env var (set when building for production → Railway URL)
-//  2. localhost dev → empty string (Vite proxy handles /api → Express)
-//  3. Any other host without env var → empty string (Railway serves frontend too)
-const _hostname = typeof window !== "undefined" ? window.location.hostname : "localhost";
-export const _isLocalhost = _hostname === "localhost" || _hostname === "127.0.0.1";
+// __PORT_5000__ is replaced at deploy time by deploy_website.
+// In dev (localhost), it starts with "__" → falls back to "" (same-origin Vite proxy).
+// On deploy_website, it becomes the proxied backend URL.
+const API_BASE = "__PORT_5000__".startsWith("__") ? "" : "__PORT_5000__";
 
-// injected at build time via vite define; empty string = same-origin
-const _envApiUrl: string = (import.meta as any).env?.VITE_API_URL ?? "";
-export const API_BASE: string = _envApiUrl || "";
-
-// ─── Backend availability ─────────────────────────────────────────────────────
-// We ping once on load. If unreachable, all mutations fall back to localStore.
-let _backendAvailable: boolean | null = null;
-
-export async function checkBackend(): Promise<boolean> {
-  if (_backendAvailable !== null) return _backendAvailable;
-  try {
-    const r = await fetch(`${API_BASE}/api/items`, { signal: AbortSignal.timeout(3000) });
-    _backendAvailable = r.ok || r.status < 500;
-  } catch {
-    _backendAvailable = false;
-  }
-  return _backendAvailable;
-}
-
-export function isBackendAvailable() { return _backendAvailable; }
-export function setBackendAvailable(v: boolean) { _backendAvailable = v; }
+export { API_BASE };
 
 // ─── Error helper ─────────────────────────────────────────────────────────────
 async function throwIfResNotOk(res: Response) {
@@ -65,10 +43,26 @@ export async function apiRequest(
   return res;
 }
 
+// ─── Backend availability ─────────────────────────────────────────────────────
+let _backendAvailable: boolean | null = null;
+
+export async function checkBackend(): Promise<boolean> {
+  if (_backendAvailable !== null) return _backendAvailable;
+  try {
+    const r = await fetch(`${API_BASE}/api/items`, { signal: AbortSignal.timeout(3000) });
+    _backendAvailable = r.ok || r.status < 500;
+  } catch {
+    _backendAvailable = false;
+  }
+  return _backendAvailable;
+}
+
+export function isBackendAvailable() { return _backendAvailable; }
+export function setBackendAvailable(v: boolean) { _backendAvailable = v; }
+
 // ─── Default query function ───────────────────────────────────────────────────
-// For /api/items and /api/collections: if backend is unavailable, return local store.
-// On GitHub Pages (_isLocalhost === false), NEVER sync localStore from backend —
-// the backend returns empty arrays which would wipe persisted data.
+// When backend is available: sync localStore from it (single source of truth).
+// When backend fails: fall back to localStore (offline / GitHub Pages static).
 export const getQueryFn: <T>(options: { on401: "returnNull" | "throw" }) => QueryFunction<T> =
   ({ on401 }) =>
   async ({ queryKey }) => {
@@ -82,28 +76,14 @@ export const getQueryFn: <T>(options: { on401: "returnNull" | "throw" }) => Quer
       const data = await res.json();
       setBackendAvailable(true);
 
-      // Only sync localStore from backend when running locally (real backend with real data).
-      // On GitHub Pages the backend returns empty arrays which would wipe persisted localStorage.
-      if (_isLocalhost) {
-        if (key === "/api/items") localStore.replaceItems(data);
-        if (key === "/api/collections") localStore.replaceCollections(data);
-        return data as T;
-      }
-
-      // On GitHub Pages: backend may return [] — prefer localStore if it has data
-      if (key === "/api/items") {
-        const local = localStore.getItems();
-        return (local.length > 0 ? local : data) as T;
-      }
-      if (key.startsWith("/api/collections") && !key.includes("/items")) {
-        const local = localStore.getCollections();
-        return (local.length > 0 ? local : data) as T;
-      }
+      // Sync localStore from backend (real data)
+      if (key === "/api/items") localStore.replaceItems(data);
+      if (key === "/api/collections") localStore.replaceCollections(data);
 
       return data as T;
-    } catch (e) {
+    } catch {
       setBackendAvailable(false);
-      // Fall back to local store
+      // Fall back to localStore (offline / static hosting)
       if (key === "/api/items") return localStore.getItems() as T;
       if (key.startsWith("/api/collections") && !key.includes("/items")) return localStore.getCollections() as T;
       return [] as T;
