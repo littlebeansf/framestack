@@ -6,6 +6,8 @@ import {
   type Collection, type InsertCollection,
   type CollectionItem, type InsertCollectionItem,
   type Profile, type InsertProfile,
+  type ItemWithStatus,
+  OWNERS, DEFAULT_COLLECTIONS,
 } from "@shared/schema";
 import { getDb, getDrizzle } from "./db";
 
@@ -67,19 +69,27 @@ sqlite.exec(`
     owner TEXT NOT NULL DEFAULT 'together',
     name TEXT NOT NULL,
     description TEXT,
-    cover_url TEXT
+    cover_url TEXT,
+    is_default INTEGER NOT NULL DEFAULT 0,
+    media_group TEXT,
+    default_status TEXT
   );
 
   CREATE TABLE IF NOT EXISTS collection_items (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     collection_id INTEGER NOT NULL REFERENCES collections(id),
-    item_id INTEGER NOT NULL REFERENCES items(id)
+    item_id INTEGER NOT NULL REFERENCES items(id),
+    status TEXT
   );
 `);
 
 // Add new columns to existing tables if upgrading
 try { sqlite.exec(`ALTER TABLE items ADD COLUMN added_by TEXT`); } catch {}
 try { sqlite.exec(`ALTER TABLE collections ADD COLUMN owner TEXT NOT NULL DEFAULT 'together'`); } catch {}
+try { sqlite.exec(`ALTER TABLE collections ADD COLUMN is_default INTEGER NOT NULL DEFAULT 0`); } catch {}
+try { sqlite.exec(`ALTER TABLE collections ADD COLUMN media_group TEXT`); } catch {}
+try { sqlite.exec(`ALTER TABLE collections ADD COLUMN default_status TEXT`); } catch {}
+try { sqlite.exec(`ALTER TABLE collection_items ADD COLUMN status TEXT`); } catch {}
 
 // Seed default profiles
 function seedProfiles() {
@@ -110,6 +120,34 @@ function seedProfiles() {
 }
 seedProfiles();
 
+// Seed default collections for each owner
+function seedDefaultCollections() {
+  for (const owner of OWNERS) {
+    for (const def of DEFAULT_COLLECTIONS) {
+      const existing = db.select().from(collections).where(
+        and(
+          eq(collections.owner, owner),
+          eq(collections.isDefault, true),
+          eq(collections.defaultStatus, def.defaultStatus),
+          eq(collections.mediaGroup, def.mediaGroup),
+        )
+      ).get();
+      if (!existing) {
+        db.insert(collections).values({
+          userId: 1,
+          owner,
+          name: def.name,
+          description: def.description,
+          isDefault: true,
+          mediaGroup: def.mediaGroup,
+          defaultStatus: def.defaultStatus,
+        }).run();
+      }
+    }
+  }
+}
+seedDefaultCollections();
+
 // ─── Interface ───────────────────────────────────────────────────────────────
 
 export interface IStorage {
@@ -136,11 +174,14 @@ export interface IStorage {
   updateCollection(id: number, data: Partial<InsertCollection>): Collection | undefined;
   deleteCollection(id: number): void;
 
-  // Collection Items
-  getItemsInCollection(collectionId: number): Item[];
+  // Collection Items — now with status
+  getItemsInCollection(collectionId: number): ItemWithStatus[];
+  getCollectionItem(collectionId: number, itemId: number): CollectionItem | undefined;
   addItemToCollection(data: InsertCollectionItem): CollectionItem;
   removeItemFromCollection(collectionId: number, itemId: number): void;
+  updateCollectionItemStatus(collectionId: number, itemId: number, status: string): CollectionItem | undefined;
   getCollectionsForItem(itemId: number): Collection[];
+  getCollectionItemsForItem(itemId: number): CollectionItem[];
 }
 
 export class Storage implements IStorage {
@@ -198,26 +239,55 @@ export class Storage implements IStorage {
     db.delete(collections).where(eq(collections.id, id)).run();
   }
 
-  getItemsInCollection(collectionId: number) {
-    const rows = db.select({ item: items })
+  getItemsInCollection(collectionId: number): ItemWithStatus[] {
+    const rows = db.select({ item: items, ci: collectionItems })
       .from(collectionItems)
       .innerJoin(items, eq(collectionItems.itemId, items.id))
       .where(eq(collectionItems.collectionId, collectionId))
       .all();
-    return rows.map((r) => r.item);
+    return rows.map((r) => ({
+      ...r.item,
+      collectionItemId: r.ci.id,
+      collectionStatus: r.ci.status,
+    }));
   }
+
+  getCollectionItem(collectionId: number, itemId: number) {
+    return db.select().from(collectionItems)
+      .where(and(eq(collectionItems.collectionId, collectionId), eq(collectionItems.itemId, itemId)))
+      .get();
+  }
+
   addItemToCollection(data: InsertCollectionItem) {
     const existing = db.select().from(collectionItems)
       .where(and(eq(collectionItems.collectionId, data.collectionId), eq(collectionItems.itemId, data.itemId)))
       .get();
-    if (existing) return existing;
+    if (existing) {
+      // Update status if provided and different
+      if (data.status && data.status !== existing.status) {
+        return db.update(collectionItems)
+          .set({ status: data.status })
+          .where(eq(collectionItems.id, existing.id))
+          .returning().get() ?? existing;
+      }
+      return existing;
+    }
     return db.insert(collectionItems).values(data).returning().get();
   }
+
   removeItemFromCollection(collectionId: number, itemId: number) {
     db.delete(collectionItems)
       .where(and(eq(collectionItems.collectionId, collectionId), eq(collectionItems.itemId, itemId)))
       .run();
   }
+
+  updateCollectionItemStatus(collectionId: number, itemId: number, status: string) {
+    return db.update(collectionItems)
+      .set({ status })
+      .where(and(eq(collectionItems.collectionId, collectionId), eq(collectionItems.itemId, itemId)))
+      .returning().get();
+  }
+
   getCollectionsForItem(itemId: number) {
     const rows = db.select({ collection: collections })
       .from(collectionItems)
@@ -225,6 +295,10 @@ export class Storage implements IStorage {
       .where(eq(collectionItems.itemId, itemId))
       .all();
     return rows.map((r) => r.collection);
+  }
+
+  getCollectionItemsForItem(itemId: number) {
+    return db.select().from(collectionItems).where(eq(collectionItems.itemId, itemId)).all();
   }
 }
 

@@ -4,7 +4,7 @@ import { apiRequest } from "@/lib/queryClient";
 import { localStore } from "@/lib/localStore";
 import { useToast } from "@/hooks/use-toast";
 import type { Item, Collection } from "@shared/schema";
-import { MEDIA_TYPES, STATUSES } from "@shared/schema";
+import { MEDIA_TYPES } from "@shared/schema";
 import {
   Dialog,
   DialogContent,
@@ -31,10 +31,6 @@ import { FolderPlus, X, Star } from "lucide-react";
 const TYPE_LABELS: Record<string, string> = {
   anime: "Anime", manga: "Manga", movie: "Movie", series: "Series", book: "Book",
 };
-const STATUS_LABELS: Record<string, string> = {
-  watching: "Watching", reading: "Reading", completed: "Completed",
-  on_hold: "On Hold", dropped: "Dropped", wishlist: "Wishlist",
-};
 
 export default function ItemEditDialog({
   item,
@@ -46,7 +42,6 @@ export default function ItemEditDialog({
   onOpenChange: (v: boolean) => void;
 }) {
   const [form, setForm] = useState({
-    status: item.status,
     rating: item.rating ?? null,
     notes: item.notes ?? "",
     mediaType: item.mediaType,
@@ -56,33 +51,30 @@ export default function ItemEditDialog({
 
   useEffect(() => {
     setForm({
-      status: item.status,
       rating: item.rating ?? null,
       notes: item.notes ?? "",
       mediaType: item.mediaType,
     });
   }, [item]);
 
-  // Use the default queryFn (has offline fallback via localStore)
+  // Only non-default collections for manual adding
   const { data: allCollections } = useQuery<Collection[]>({
     queryKey: ["/api/collections"],
   });
+  const customCollections = (allCollections || []).filter(c => !c.isDefault);
 
-  // Track which collections this item belongs to — in local state so we can update instantly
+  // Track which collections this item belongs to
   const [itemColIds, setItemColIds] = useState<Set<number>>(new Set());
 
-  // Populate from backend when dialog opens; fall back to localStore
   useEffect(() => {
     if (!open) return;
     apiRequest("GET", `/api/items/${item.id}/collections`)
       .then(r => r.json())
-      .then((cols: Collection[]) => setItemColIds(new Set(cols.map(c => c.id))))
+      .then((cols: Collection[]) => setItemColIds(new Set(cols.filter(c => !c.isDefault).map(c => c.id))))
       .catch(() => {
-        // Backend offline — read membership from localStore
         setItemColIds(new Set(localStore.getItemCollectionIds(item.id)));
       });
   }, [open, item.id]);
-
 
   const updateMutation = useMutation({
     mutationFn: async (data: any) => {
@@ -90,12 +82,10 @@ export default function ItemEditDialog({
         const res = await apiRequest("PATCH", `/api/items/${item.id}`, data);
         return await res.json();
       } catch {
-        // backend offline — update local store
         return localStore.updateItem(item.id, data) ?? { ...item, ...data };
       }
     },
     onSuccess: (updated: any) => {
-      // Source from localStore — RQ cache may be empty/stale
       const next = localStore.getItems().map(i => i.id === item.id ? { ...i, ...updated } : i);
       localStore.replaceItems(next);
       qc.setQueryData(["/api/items"], next);
@@ -113,9 +103,7 @@ export default function ItemEditDialog({
     },
     onSuccess: (collectionId: number) => {
       setItemColIds(prev => new Set([...prev, collectionId]));
-      // Persist membership to localStore so it survives refresh
       localStore.addItemToCollection(collectionId, item.id);
-      // Also update collection-detail cache if already open
       qc.setQueryData<any[]>(["/api/collections", collectionId, "items"], (old = []) => {
         if (old.some(i => i.id === item.id)) return old;
         return [...old, item];
@@ -133,7 +121,6 @@ export default function ItemEditDialog({
     },
     onSuccess: (collectionId: number) => {
       setItemColIds(prev => { const s = new Set(prev); s.delete(collectionId); return s; });
-      // Persist removal to localStore
       localStore.removeItemFromCollection(collectionId, item.id);
       qc.setQueryData<any[]>(["/api/collections", collectionId, "items"], (old = []) =>
         old.filter(i => i.id !== item.id)
@@ -142,8 +129,8 @@ export default function ItemEditDialog({
     },
   });
 
-  const availableCollections = (allCollections || []).filter(c => !itemColIds.has(c.id));
-  const currentCollections = (allCollections || []).filter(c => itemColIds.has(c.id));
+  const availableCollections = customCollections.filter(c => !itemColIds.has(c.id));
+  const currentCollections = customCollections.filter(c => itemColIds.has(c.id));
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -166,20 +153,6 @@ export default function ItemEditDialog({
                 {item.author && <span>by {item.author}</span>}
                 {item.studio && <span>{item.studio}</span>}
                 {item.episodes && <span>{item.episodes} eps</span>}
-              </div>
-
-              <div className="space-y-1">
-                <Label className="text-xs">Status</Label>
-                <Select value={form.status} onValueChange={v => setForm(f => ({ ...f, status: v }))}>
-                  <SelectTrigger data-testid="select-status" className="h-8 text-sm">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {STATUSES.map(s => (
-                      <SelectItem key={s} value={s}>{STATUS_LABELS[s]}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
               </div>
 
               <div className="space-y-1">
@@ -240,9 +213,12 @@ export default function ItemEditDialog({
 
           <Separator />
 
-          {/* Collections */}
+          {/* Custom Collections */}
           <div className="space-y-2">
-            <Label className="text-xs">Collections</Label>
+            <Label className="text-xs">Custom Collections</Label>
+            <p className="text-[11px] text-muted-foreground leading-relaxed">
+              Status-based collections are managed per-owner. Add to a custom collection below.
+            </p>
 
             {currentCollections.length > 0 && (
               <div className="flex flex-wrap gap-1.5 mb-2">
@@ -282,8 +258,8 @@ export default function ItemEditDialog({
               </div>
             )}
 
-            {(allCollections || []).length === 0 && (
-              <p className="text-xs text-muted-foreground">No collections yet. Create one from the Collections page.</p>
+            {customCollections.length === 0 && (
+              <p className="text-xs text-muted-foreground">No custom collections yet. Create one from a profile's Collections tab.</p>
             )}
           </div>
         </div>

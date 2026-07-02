@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import type { Item } from "@shared/schema";
-import { MEDIA_TYPES, STATUSES } from "@shared/schema";
+import { MEDIA_TYPES } from "@shared/schema";
 import ItemCard from "@/components/ItemCard";
 import { cn } from "@/lib/utils";
 import { Search, BookOpen, Library, SlidersHorizontal, Sparkles } from "lucide-react";
@@ -25,19 +25,6 @@ import {
 const TYPE_LABELS: Record<string, string> = {
   anime: "Anime", manga: "Manga", movie: "Movie", series: "Series", book: "Book",
 };
-const STATUS_LABELS: Record<string, string> = {
-  watching: "Watching", reading: "Reading", completed: "Completed",
-  on_hold: "On Hold", dropped: "Dropped", wishlist: "Wishlist",
-};
-
-const STATUS_DOTS: Record<string, string> = {
-  watching:  "bg-[hsl(190,75%,55%)]",
-  reading:   "bg-[hsl(255,75%,70%)]",
-  completed: "bg-[hsl(160,65%,50%)]",
-  on_hold:   "bg-[hsl(30,85%,65%)]",
-  dropped:   "bg-[hsl(0,65%,60%)]",
-  wishlist:  "bg-[hsl(220,8%,55%)]",
-};
 
 function SkeletonCard() {
   return (
@@ -54,7 +41,6 @@ function SkeletonCard() {
 export default function LibraryPage() {
   const [search, setSearch] = useState("");
   const [typeFilter, setTypeFilter] = useState<string>("all");
-  const [statusFilter, setStatusFilter] = useState<string>("all");
   const [sortBy, setSortBy] = useState<string>("recent");
 
   const { data: items, isLoading } = useQuery<Item[]>({
@@ -63,22 +49,15 @@ export default function LibraryPage() {
 
   const filtered = (items || []).filter(item => {
     if (typeFilter !== "all" && item.mediaType !== typeFilter) return false;
-    if (statusFilter !== "all" && item.status !== statusFilter) return false;
     if (search && !item.title.toLowerCase().includes(search.toLowerCase())) return false;
     return true;
   }).sort((a, b) => {
     if (sortBy === "title") return a.title.localeCompare(b.title);
     if (sortBy === "rating") return (b.rating ?? 0) - (a.rating ?? 0);
     if (sortBy === "year") return (b.year ?? "0").localeCompare(a.year ?? "0");
-    if (sortBy === "recent") return b.id - a.id; // higher id = added later
+    if (sortBy === "recent") return b.id - a.id;
     return 0;
   });
-
-  // Stats
-  const stats = STATUSES.reduce((acc, s) => {
-    acc[s] = (items || []).filter(i => i.status === s).length;
-    return acc;
-  }, {} as Record<string, number>);
 
   const filters = (
     <div className="space-y-4">
@@ -108,33 +87,6 @@ export default function LibraryPage() {
           ))}
         </div>
       </div>
-
-      <div>
-        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">Status</p>
-        <div className="space-y-0.5">
-          <button
-            onClick={() => setStatusFilter("all")}
-            className={cn("w-full text-left text-sm px-2 py-1.5 rounded-md transition-all duration-150",
-              statusFilter === "all" ? "bg-accent text-accent-foreground font-medium" : "text-muted-foreground hover:text-foreground hover:bg-secondary"
-            )}
-          >
-            All statuses
-          </button>
-          {STATUSES.map(s => (
-            <button
-              key={s}
-              onClick={() => setStatusFilter(s)}
-              className={cn("w-full text-left text-sm px-2 py-1.5 rounded-md transition-all duration-150 flex items-center gap-2",
-                statusFilter === s ? "bg-accent text-accent-foreground font-medium" : "text-muted-foreground hover:text-foreground hover:bg-secondary"
-              )}
-            >
-              <span className={cn("inline-block w-2 h-2 rounded-full shrink-0", STATUS_DOTS[s])} />
-              {STATUS_LABELS[s]}
-              <span className="ml-auto text-xs opacity-50">{stats[s] || 0}</span>
-            </button>
-          ))}
-        </div>
-      </div>
     </div>
   );
 
@@ -145,7 +97,7 @@ export default function LibraryPage() {
         <div className="sticky top-0">
           <h2 className="font-semibold text-sm text-foreground mb-4 flex items-center gap-2">
             <Library size={15} />
-            My Library
+            Shared Library
           </h2>
           {filters}
         </div>
@@ -198,7 +150,7 @@ export default function LibraryPage() {
         {/* Count */}
         <p className="text-xs text-muted-foreground mb-4">
           {isLoading ? "Loading…" : `${filtered.length} item${filtered.length !== 1 ? "s" : ""}`}
-          {(typeFilter !== "all" || statusFilter !== "all" || search) && (items || []).length > 0
+          {(typeFilter !== "all" || search) && (items || []).length > 0
             ? ` of ${(items || []).length} total`
             : ""}
         </p>
@@ -218,7 +170,7 @@ export default function LibraryPage() {
                     <Sparkles size={22} className="text-primary opacity-60" />
                   </div>
                 </div>
-                <p className="font-semibold text-foreground text-sm mb-1">Your library is empty</p>
+                <p className="font-semibold text-foreground text-sm mb-1">The library is empty</p>
                 <p className="text-xs max-w-[240px] leading-relaxed">
                   Hit the search icon in the sidebar to find anime, manga, movies, series and books — then add them here.
                 </p>

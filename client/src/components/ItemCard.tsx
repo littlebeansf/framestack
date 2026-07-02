@@ -4,7 +4,7 @@ import { apiRequest } from "@/lib/queryClient";
 import { localStore } from "@/lib/localStore";
 import { useToast } from "@/hooks/use-toast";
 import type { Item } from "@shared/schema";
-import { STATUSES } from "@shared/schema";
+import { STATUS_LABELS, STATUS_COLORS, getMediaGroup } from "@shared/schema";
 import { cn } from "@/lib/utils";
 import {
   DropdownMenu,
@@ -24,51 +24,29 @@ const TYPE_ICONS: Record<string, any> = {
   book: Book,
 };
 
-const STATUS_COLORS: Record<string, string> = {
-  watching:  "hsl(190 75% 55%)",
-  reading:   "hsl(255 75% 70%)",
-  completed: "hsl(160 65% 50%)",
-  on_hold:   "hsl(30 85% 65%)",
-  dropped:   "hsl(0 65% 60%)",
-  wishlist:  "hsl(220 8% 55%)",
-};
-
-// Left-border accent + cover overlay per status
-const STATUS_BORDER: Record<string, string> = {
-  completed:  "hsl(160 65% 50%)",
-  watching:   "hsl(190 75% 55%)",
-  reading:    "hsl(255 75% 70%)",
-  on_hold:    "hsl(30 85% 65%)",
-  dropped:    "hsl(0 65% 60%)",
-  wishlist:   "transparent",
-};
-
-// Cover overlay tint for not-started / hold / dropped — dims the cover slightly
-const STATUS_OVERLAY: Record<string, string | null> = {
-  completed:  null,
-  watching:   null,
-  reading:    null,
-  on_hold:    "rgba(30,30,60,0.35)",
-  dropped:    "rgba(60,10,10,0.40)",
-  wishlist:   "rgba(0,0,0,0.25)",
-};
-
-const STATUS_LABELS: Record<string, string> = {
-  watching:  "Watching",
-  reading:   "Reading",
-  completed: "Completed",
-  on_hold:   "On Hold",
-  dropped:   "Dropped",
-  wishlist:  "Wishlist",
-};
-
-// Cycle through statuses on quick-click
-const STATUS_CYCLE = STATUSES; // watching → reading → completed → on_hold → dropped → wishlist
-
-export default function ItemCard({ item, index = 0 }: { item: Item; index?: number }) {
+export default function ItemCard({
+  item,
+  index = 0,
+  // Collection-context props (when shown inside a collection)
+  collectionId,
+  collectionStatus,
+  onStatusChange,
+  onRemoveFromCollection,
+}: {
+  item: Item;
+  index?: number;
+  collectionId?: number;
+  collectionStatus?: string | null;
+  onStatusChange?: (itemId: number, newStatus: string) => void;
+  onRemoveFromCollection?: (itemId: number) => void;
+}) {
   const [editOpen, setEditOpen] = useState(false);
   const { toast } = useToast();
   const qc = useQueryClient();
+
+  const inCollection = collectionId !== undefined;
+  const statusColor = collectionStatus ? (STATUS_COLORS[collectionStatus] ?? "hsl(220 8% 55%)") : null;
+  const statusLabel = collectionStatus ? (STATUS_LABELS[collectionStatus] ?? collectionStatus) : null;
 
   const deleteMutation = useMutation({
     mutationFn: async () => {
@@ -77,8 +55,6 @@ export default function ItemCard({ item, index = 0 }: { item: Item; index?: numb
       } catch { /* offline — handled in onSuccess */ }
     },
     onSuccess: () => {
-      // Always source from localStore — RQ cache may be empty if user hasn't
-      // visited the library page yet this session (e.g. navigated straight to collection detail)
       const updated = localStore.getItems().filter(i => i.id !== item.id);
       localStore.replaceItems(updated);
       qc.setQueryData(["/api/items"], updated);
@@ -86,36 +62,7 @@ export default function ItemCard({ item, index = 0 }: { item: Item; index?: numb
     },
   });
 
-  // Quick-cycle status on status-dot click (no dialog needed)
-  const cycleStatusMutation = useMutation({
-    mutationFn: async (newStatus: string) => {
-      try {
-        const res = await apiRequest("PATCH", `/api/items/${item.id}`, { status: newStatus });
-        return await res.json();
-      } catch {
-        return localStore.updateItem(item.id, { status: newStatus }) ?? { ...item, status: newStatus };
-      }
-    },
-    onSuccess: (updated: any) => {
-      // Source from localStore to avoid stale/empty RQ cache overwriting persisted data
-      const next = localStore.getItems().map(i => i.id === item.id ? { ...i, ...updated } : i);
-      localStore.replaceItems(next);
-      qc.setQueryData(["/api/items"], next);
-      toast({ title: STATUS_LABELS[updated.status], description: item.title });
-    },
-  });
-
-  function handleStatusDotClick(e: React.MouseEvent) {
-    e.stopPropagation();
-    const currentIdx = STATUS_CYCLE.indexOf(item.status as any);
-    const nextStatus = STATUS_CYCLE[(currentIdx + 1) % STATUS_CYCLE.length];
-    cycleStatusMutation.mutate(nextStatus);
-  }
-
   const Icon = TYPE_ICONS[item.mediaType] || Star;
-  const statusColor  = STATUS_COLORS[item.status]  || STATUS_COLORS.wishlist;
-  const statusBorder = STATUS_BORDER[item.status]  || "transparent";
-  const statusOverlay = STATUS_OVERLAY[item.status] ?? null;
 
   return (
     <>
@@ -129,8 +76,10 @@ export default function ItemCard({ item, index = 0 }: { item: Item; index?: numb
         style={{
           animationDelay: `${index * 40}ms`,
           animationFillMode: "both",
-          borderLeftColor: statusBorder,
-          borderLeftWidth: statusBorder !== "transparent" ? "3px" : "1px",
+          ...(statusColor ? {
+            borderLeftColor: statusColor,
+            borderLeftWidth: "3px",
+          } : {}),
         }}
         onClick={() => setEditOpen(true)}
       >
@@ -152,23 +101,8 @@ export default function ItemCard({ item, index = 0 }: { item: Item; index?: numb
             </div>
           )}
 
-          {/* Status overlay tint (dims not-started / on-hold / dropped) */}
-          {statusOverlay && (
-            <div className="absolute inset-0 pointer-events-none" style={{ backgroundColor: statusOverlay }} />
-          )}
-
           {/* Bottom gradient overlay */}
           <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-
-          {/* Status indicator dot — click to cycle */}
-          <button
-            className="absolute top-2 left-2 w-2.5 h-2.5 rounded-full shadow-md transition-transform duration-150 hover:scale-125 focus:outline-none focus:ring-2 focus:ring-white/40"
-            style={{ backgroundColor: statusColor }}
-            title={`${STATUS_LABELS[item.status]} — click to change`}
-            onClick={handleStatusDotClick}
-            aria-label={`Status: ${STATUS_LABELS[item.status]}`}
-            data-testid={`button-status-${item.id}`}
-          />
 
           {/* Rating badge */}
           {item.rating && (
@@ -180,17 +114,19 @@ export default function ItemCard({ item, index = 0 }: { item: Item; index?: numb
 
           {/* Hover: quick actions overlay */}
           <div className="absolute bottom-2 left-2 right-2 flex items-center justify-between opacity-0 group-hover:opacity-100 transition-opacity duration-200">
-            {/* Status label pill */}
-            <span
-              className="text-[10px] font-medium px-2 py-0.5 rounded-full"
-              style={{
-                backgroundColor: `${statusColor}33`,
-                color: statusColor,
-                border: `1px solid ${statusColor}55`,
-              }}
-            >
-              {STATUS_LABELS[item.status]}
-            </span>
+            {/* Status pill (collection context only) */}
+            {statusColor && statusLabel ? (
+              <span
+                className="text-[10px] font-medium px-2 py-0.5 rounded-full truncate max-w-[80px]"
+                style={{
+                  backgroundColor: `${statusColor}33`,
+                  color: statusColor,
+                  border: `1px solid ${statusColor}55`,
+                }}
+              >
+                {statusLabel}
+              </span>
+            ) : <span />}
 
             {/* Menu button */}
             <div onClick={(e) => e.stopPropagation()}>
@@ -204,19 +140,32 @@ export default function ItemCard({ item, index = 0 }: { item: Item; index?: numb
                     <MoreHorizontal size={14} />
                   </button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-40">
+                <DropdownMenuContent align="end" className="w-44">
                   <DropdownMenuItem onClick={() => setEditOpen(true)}>
                     <Edit3 size={13} className="mr-2" />
                     Edit
                   </DropdownMenuItem>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem
-                    className="text-destructive focus:text-destructive"
-                    onClick={() => deleteMutation.mutate()}
-                  >
-                    <Trash2 size={13} className="mr-2" />
-                    Remove
-                  </DropdownMenuItem>
+                  {inCollection && onRemoveFromCollection && (
+                    <>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem onClick={() => onRemoveFromCollection(item.id)}>
+                        <Trash2 size={13} className="mr-2" />
+                        Remove from collection
+                      </DropdownMenuItem>
+                    </>
+                  )}
+                  {!inCollection && (
+                    <>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem
+                        className="text-destructive focus:text-destructive"
+                        onClick={() => deleteMutation.mutate()}
+                      >
+                        <Trash2 size={13} className="mr-2" />
+                        Remove from library
+                      </DropdownMenuItem>
+                    </>
+                  )}
                 </DropdownMenuContent>
               </DropdownMenu>
             </div>

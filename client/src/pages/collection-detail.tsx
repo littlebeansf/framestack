@@ -1,12 +1,21 @@
+import { useState } from "react";
 import { useRoute, useLocation } from "wouter";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { localStore } from "@/lib/localStore";
-import type { Collection, Item } from "@shared/schema";
+import type { Collection } from "@shared/schema";
+import type { ItemWithStatus } from "@shared/schema";
+import { STATUS_LABELS, STATUS_COLORS, getStatusesForMediaType } from "@shared/schema";
 import { useToast } from "@/hooks/use-toast";
-import { ArrowLeft, FolderOpen, Clock } from "lucide-react";
+import { ArrowLeft, FolderOpen, Clock, ChevronDown } from "lucide-react";
 import ItemCard from "@/components/ItemCard";
 import { calcCollectionTimeStats, formatDuration } from "@/lib/timeEstimate";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 function SkeletonCard() {
   return (
@@ -20,9 +29,68 @@ function SkeletonCard() {
   );
 }
 
+// ── Status Chip (inline changer) ──────────────────────────────────────────────
+
+function StatusChip({
+  item,
+  collectionId,
+  onStatusChange,
+}: {
+  item: ItemWithStatus;
+  collectionId: number;
+  onStatusChange: (itemId: number, status: string) => void;
+}) {
+  const statuses = getStatusesForMediaType(item.mediaType);
+  const currentStatus = item.collectionStatus;
+  const color = currentStatus ? (STATUS_COLORS[currentStatus] ?? "hsl(220 8% 55%)") : "hsl(220 8% 55%)";
+  const label = currentStatus ? (STATUS_LABELS[currentStatus] ?? currentStatus) : "Set status";
+
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <button
+          className="flex items-center gap-1 text-[10px] font-medium px-2 py-0.5 rounded-full transition-all hover:opacity-80"
+          style={{
+            backgroundColor: currentStatus ? `${color}25` : "hsl(220 8% 20%)",
+            color: currentStatus ? color : "hsl(220 8% 65%)",
+            border: `1px solid ${currentStatus ? `${color}55` : "hsl(220 8% 30%)"}`,
+          }}
+          onClick={e => e.stopPropagation()}
+          data-testid={`button-status-chip-${item.id}`}
+        >
+          {currentStatus && (
+            <span
+              className="w-1.5 h-1.5 rounded-full shrink-0"
+              style={{ backgroundColor: color }}
+            />
+          )}
+          <span className="truncate max-w-[72px]">{label}</span>
+          <ChevronDown size={9} className="shrink-0 opacity-60" />
+        </button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="start" className="w-40" onClick={e => e.stopPropagation()}>
+        {statuses.map(s => (
+          <DropdownMenuItem
+            key={s}
+            onClick={() => onStatusChange(item.id, s)}
+            className="flex items-center gap-2 text-xs"
+            data-testid={`status-option-${s}`}
+          >
+            <span
+              className="w-2 h-2 rounded-full shrink-0"
+              style={{ backgroundColor: STATUS_COLORS[s] ?? "hsl(220 8% 55%)" }}
+            />
+            {STATUS_LABELS[s] ?? s}
+          </DropdownMenuItem>
+        ))}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+
 // ── Time Bar ─────────────────────────────────────────────────────────────────
 
-function CollectionTimeBar({ items }: { items: Item[] }) {
+function CollectionTimeBar({ items }: { items: ItemWithStatus[] }) {
   const stats = calcCollectionTimeStats(items);
   if (!stats.hasEstimate || items.length === 0) return null;
 
@@ -34,7 +102,6 @@ function CollectionTimeBar({ items }: { items: Item[] }) {
 
   return (
     <div className="rounded-xl border border-border bg-card p-4 space-y-3">
-      {/* Header row */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2 text-muted-foreground">
           <Clock size={13} />
@@ -45,7 +112,6 @@ function CollectionTimeBar({ items }: { items: Item[] }) {
         </span>
       </div>
 
-      {/* Segmented bar */}
       <div className="flex h-2 rounded-full overflow-hidden gap-px bg-secondary">
         {segments.map((s, i) => (
           <div
@@ -56,7 +122,6 @@ function CollectionTimeBar({ items }: { items: Item[] }) {
         ))}
       </div>
 
-      {/* Legend */}
       <div className="flex items-center gap-4 flex-wrap">
         {[
           stats.completedMinutes   > 0 && { color: "hsl(160 65% 45%)", label: "Completed",   mins: stats.completedMinutes },
@@ -90,16 +155,17 @@ export default function CollectionDetailPage() {
   });
   const collection = (allCollections || []).find(c => c.id === id);
 
-  const { data: items, isLoading } = useQuery<Item[]>({
+  const { data: items, isLoading } = useQuery<ItemWithStatus[]>({
     queryKey: ["/api/collections", id, "items"],
     queryFn: async () => {
       try {
         const res = await apiRequest("GET", `/api/collections/${id}/items`);
-        const data: Item[] = await res.json();
+        const data: ItemWithStatus[] = await res.json();
         data.forEach(i => localStore.addItemToCollection(id, i.id));
         return data;
       } catch {
-        return localStore.getCollectionItems(id);
+        // Fallback: items without status
+        return localStore.getCollectionItems(id) as ItemWithStatus[];
       }
     },
     enabled: !!id,
@@ -121,19 +187,42 @@ export default function CollectionDetailPage() {
     },
   });
 
+  const statusMutation = useMutation({
+    mutationFn: async ({ itemId, status }: { itemId: number; status: string }) => {
+      await apiRequest("PATCH", `/api/collections/${id}/items/${itemId}/status`, { status });
+      return { itemId, status };
+    },
+    onSuccess: ({ itemId, status }) => {
+      qc.setQueryData<ItemWithStatus[]>(["/api/collections", id, "items"], (old = []) =>
+        old.map(i => i.id === itemId ? { ...i, collectionStatus: status } : i)
+      );
+      toast({ title: STATUS_LABELS[status] ?? status, description: "Status updated" });
+    },
+    onError: () => toast({ title: "Failed to update status", variant: "destructive" }),
+  });
+
+  const handleStatusChange = (itemId: number, status: string) => {
+    statusMutation.mutate({ itemId, status });
+  };
+
   const itemList = items || [];
+
+  // Back destination: owner collections page if collection has an owner
+  const backPath = collection?.owner
+    ? (collection.owner === "jack" ? "/jack" : collection.owner === "sally" ? "/sally" : "/together")
+    : "/collections";
 
   return (
     <div className="animate-page-in space-y-6">
       {/* Back + header */}
       <div>
         <button
-          onClick={() => setLocation("/collections")}
+          onClick={() => setLocation(backPath)}
           data-testid="button-back-collections"
           className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors mb-4"
         >
           <ArrowLeft size={14} />
-          Collections
+          {collection?.owner === "jack" ? "Jack" : collection?.owner === "sally" ? "Sally" : collection?.owner === "together" ? "Together" : "Collections"}
         </button>
 
         <div className="flex items-start justify-between gap-4">
@@ -145,6 +234,11 @@ export default function CollectionDetailPage() {
             {collection?.description && (
               <p className="text-sm text-muted-foreground mt-1">{collection.description}</p>
             )}
+            {collection?.isDefault && (
+              <span className="inline-block mt-1.5 text-[10px] px-2 py-0.5 rounded-full bg-primary/10 text-primary border border-primary/20 font-medium">
+                {collection.mediaGroup === "anime" ? "Anime · Movie · Series" : "Manga · Book"}
+              </span>
+            )}
           </div>
           <span className="text-xs text-muted-foreground shrink-0 mt-1">
             {itemList.length} item{itemList.length !== 1 ? "s" : ""}
@@ -152,7 +246,7 @@ export default function CollectionDetailPage() {
         </div>
       </div>
 
-      {/* Time bar — shown when items are loaded */}
+      {/* Time bar */}
       {!isLoading && itemList.length > 0 && (
         <CollectionTimeBar items={itemList} />
       )}
@@ -166,12 +260,31 @@ export default function CollectionDetailPage() {
         <div className="flex flex-col items-center justify-center py-20 text-center text-muted-foreground">
           <FolderOpen size={40} className="mb-4 opacity-20" />
           <p className="font-medium text-foreground text-sm">This collection is empty</p>
-          <p className="text-xs mt-1 max-w-xs">Open an item from your library and add it to this collection.</p>
+          <p className="text-xs mt-1 max-w-xs">
+            {collection?.isDefault
+              ? "Go to your profile or Together area and add items from the library mirror."
+              : "Open an item from the library and add it to this collection."}
+          </p>
         </div>
       ) : (
         <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-3">
           {itemList.map((item, i) => (
-            <ItemCard key={item.id} item={item} index={i} />
+            <div key={item.id} className="flex flex-col gap-1">
+              <ItemCard
+                item={item}
+                index={i}
+                collectionId={id}
+                collectionStatus={item.collectionStatus}
+                onRemoveFromCollection={(itemId) => removeMutation.mutate(itemId)}
+                onStatusChange={handleStatusChange}
+              />
+              {/* Status chip below card */}
+              <StatusChip
+                item={item}
+                collectionId={id}
+                onStatusChange={handleStatusChange}
+              />
+            </div>
           ))}
         </div>
       )}

@@ -68,6 +68,11 @@ export async function registerRoutes(httpServer: Server, app: Express) {
     res.json(storage.getCollectionsForItem(parseInt(req.params.id)));
   });
 
+  // Get all collection-items for a specific item (with status info)
+  app.get("/api/items/:id/collection-items", (req, res) => {
+    res.json(storage.getCollectionItemsForItem(parseInt(req.params.id)));
+  });
+
   // ─── Collections (owner-scoped) ────────────────────────────────────────────
 
   // Get all collections (optionally filtered by owner)
@@ -102,7 +107,10 @@ export async function registerRoutes(httpServer: Server, app: Express) {
   app.delete("/api/collections/:id", (req, res) => {
     try {
       const id = parseInt(req.params.id);
-      if (!storage.getCollectionById(id)) return res.status(404).json({ error: "Not found" });
+      const col = storage.getCollectionById(id);
+      if (!col) return res.status(404).json({ error: "Not found" });
+      // Prevent deleting default/system collections
+      if (col.isDefault) return res.status(403).json({ error: "Cannot delete a default collection" });
       storage.deleteCollection(id);
       res.json({ ok: true });
     } catch (err: any) {
@@ -110,6 +118,7 @@ export async function registerRoutes(httpServer: Server, app: Express) {
     }
   });
 
+  // Get items in collection (returns ItemWithStatus — includes collectionStatus field)
   app.get("/api/collections/:id/items", (req, res) => {
     res.json(storage.getItemsInCollection(parseInt(req.params.id)));
   });
@@ -117,8 +126,8 @@ export async function registerRoutes(httpServer: Server, app: Express) {
   app.post("/api/collections/:id/items", (req, res) => {
     try {
       const collectionId = parseInt(req.params.id);
-      const { itemId } = req.body;
-      res.json(storage.addItemToCollection({ collectionId, itemId }));
+      const { itemId, status } = req.body;
+      res.json(storage.addItemToCollection({ collectionId, itemId, status: status ?? null }));
     } catch (err: any) {
       res.status(500).json({ error: err.message });
     }
@@ -128,6 +137,20 @@ export async function registerRoutes(httpServer: Server, app: Express) {
     try {
       storage.removeItemFromCollection(parseInt(req.params.id), parseInt(req.params.itemId));
       res.json({ ok: true });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // Update the status of an item within a specific collection
+  app.patch("/api/collections/:id/items/:itemId/status", (req, res) => {
+    try {
+      const collectionId = parseInt(req.params.id);
+      const itemId = parseInt(req.params.itemId);
+      const { status } = req.body;
+      const updated = storage.updateCollectionItemStatus(collectionId, itemId, status);
+      if (!updated) return res.status(404).json({ error: "Collection-item not found" });
+      res.json(updated);
     } catch (err: any) {
       res.status(500).json({ error: err.message });
     }
@@ -147,15 +170,19 @@ export async function registerRoutes(httpServer: Server, app: Express) {
       }
       for (const col of importCollections) {
         const { id: oldId, userId: _u, ...rest } = col;
+        // Skip default collections during import (they're seeded automatically)
+        if (rest.isDefault) continue;
         colIdMap[oldId] = storage.createCollection({ ...rest, userId: USER_ID }).id;
       }
       for (const [oldColId, oldItemIds] of Object.entries(colItems)) {
         const newColId = colIdMap[Number(oldColId)];
         if (!newColId) continue;
-        for (const oldItemId of oldItemIds as number[]) {
+        for (const entry of oldItemIds as any[]) {
+          const oldItemId = typeof entry === "number" ? entry : entry.itemId;
           const newItemId = itemIdMap[oldItemId];
+          const status = typeof entry === "object" ? entry.status : null;
           if (newItemId) {
-            try { storage.addItemToCollection({ collectionId: newColId, itemId: newItemId }); } catch {}
+            try { storage.addItemToCollection({ collectionId: newColId, itemId: newItemId, status: status ?? null }); } catch {}
           }
         }
       }
