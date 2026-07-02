@@ -53,7 +53,6 @@ export default function LibraryPage() {
     return true;
   }).sort((a, b) => {
     if (sortBy === "title") return a.title.localeCompare(b.title);
-    if (sortBy === "rating") return (b.rating ?? 0) - (a.rating ?? 0);
     if (sortBy === "year") return (b.year ?? "0").localeCompare(a.year ?? "0");
     if (sortBy === "recent") return b.id - a.id;
     return 0;
@@ -125,7 +124,6 @@ export default function LibraryPage() {
             <SelectContent>
               <SelectItem value="recent">Sort: Recent</SelectItem>
               <SelectItem value="title">Sort: Title</SelectItem>
-              <SelectItem value="rating">Sort: Rating</SelectItem>
               <SelectItem value="year">Sort: Year</SelectItem>
             </SelectContent>
           </Select>

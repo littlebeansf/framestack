@@ -25,8 +25,7 @@ import {
 } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
-import { Slider } from "@/components/ui/slider";
-import { FolderPlus, X, Star } from "lucide-react";
+import { FolderPlus, X } from "lucide-react";
 
 const TYPE_LABELS: Record<string, string> = {
   anime: "Anime", manga: "Manga", movie: "Movie", series: "Series", book: "Book",
@@ -42,7 +41,6 @@ export default function ItemEditDialog({
   onOpenChange: (v: boolean) => void;
 }) {
   const [form, setForm] = useState({
-    rating: item.rating ?? null,
     notes: item.notes ?? "",
     mediaType: item.mediaType,
   });
@@ -51,7 +49,6 @@ export default function ItemEditDialog({
 
   useEffect(() => {
     setForm({
-      rating: item.rating ?? null,
       notes: item.notes ?? "",
       mediaType: item.mediaType,
     });
@@ -169,33 +166,6 @@ export default function ItemEditDialog({
                 </Select>
               </div>
             </div>
-          </div>
-
-          {/* Rating */}
-          <div className="space-y-2">
-            <div className="flex items-center justify-between">
-              <Label className="text-xs">Rating</Label>
-              <div className="flex items-center gap-1">
-                {form.rating ? (
-                  <>
-                    <Star size={12} className="text-yellow-400 fill-yellow-400" />
-                    <span className="text-sm font-semibold">{form.rating}</span>
-                    <span className="text-xs text-muted-foreground">/10</span>
-                  </>
-                ) : (
-                  <span className="text-xs text-muted-foreground">Not rated</span>
-                )}
-              </div>
-            </div>
-            <Slider
-              data-testid="slider-rating"
-              min={0}
-              max={10}
-              step={0.5}
-              value={[form.rating ?? 0]}
-              onValueChange={([v]) => setForm(f => ({ ...f, rating: v === 0 ? null : v }))}
-              className="w-full"
-            />
           </div>
 
           {/* Notes */}

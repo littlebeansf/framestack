@@ -1,8 +1,8 @@
 import { useState } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient, useQueries } from "@tanstack/react-query";
 import { apiRequest, API_BASE } from "@/lib/queryClient";
 import type { Collection, Item } from "@shared/schema";
-import { STATUS_LABELS, STATUS_COLORS, getStatusesForMediaType, getMediaGroup } from "@shared/schema";
+import { STATUS_LABELS, STATUS_COLORS, getStatusesForMediaType, getMediaGroup, getExactMediaGroup } from "@shared/schema";
 import { useLocation } from "wouter";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
@@ -14,7 +14,7 @@ import {
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Plus, MoreHorizontal, Trash2, Edit3, ChevronRight, Layers, Sparkles, BookOpen, Film, Star, Tv, Book, Search as SearchIcon, Check, ChevronDown } from "lucide-react";
+import { Plus, MoreHorizontal, Trash2, Edit3, ChevronRight, Layers, Sparkles, BookOpen, Film, Star, Tv, Book, Search as SearchIcon, Check, ArrowUpDown } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const OWNER_META: Record<string, { label: string; emoji: string; accent: string; emptyMsg: string }> = {
@@ -31,8 +31,8 @@ const OWNER_META: Record<string, { label: string; emoji: string; accent: string;
     emptyMsg: "No custom collections yet. Time to organise your fictional universe.",
   },
   together: {
-    label: "Together 🫶",
-    emoji: "🫶",
+    label: "Together 🏠",
+    emoji: "🏠",
     accent: "hsl(20 90% 60%)",
     emptyMsg: "Nothing shared yet. Start building your joint universe.",
   },
@@ -42,10 +42,30 @@ const TYPE_ICONS: Record<string, any> = {
   anime: Star, manga: BookOpen, movie: Film, series: Tv, book: Book,
 };
 
-const MEDIA_GROUP_LABELS: Record<string, string> = {
-  anime: "Anime · Movie · Series",
-  book: "Manga · Book",
-};
+// Per-type section config for the collections page
+const MEDIA_TYPE_SECTIONS: Array<{
+  key: string;
+  label: string;
+  Icon: any;
+  statusOrder: string[];
+}> = [
+  { key: "anime",  label: "Anime",  Icon: Star,     statusOrder: ["watching", "completed", "want_to_rewatch", "dropped"] },
+  { key: "movie",  label: "Movie",  Icon: Film,     statusOrder: ["watching", "completed", "want_to_rewatch", "dropped"] },
+  { key: "series", label: "Series", Icon: Tv,       statusOrder: ["watching", "completed", "want_to_rewatch", "dropped"] },
+  { key: "manga",  label: "Manga",  Icon: BookOpen, statusOrder: ["reading", "completed", "wishlist", "owned"] },
+  { key: "book",   label: "Book",   Icon: Book,     statusOrder: ["reading", "completed", "wishlist", "owned"] },
+];
+
+// Tab config (media types + custom)
+type TabKey = "anime" | "movie" | "series" | "manga" | "book" | "custom";
+const COLLECTION_TABS: Array<{ key: TabKey; label: string; Icon: any }> = [
+  { key: "anime",  label: "Anime",  Icon: Star },
+  { key: "movie",  label: "Movie",  Icon: Film },
+  { key: "series", label: "Series", Icon: Tv },
+  { key: "manga",  label: "Manga",  Icon: BookOpen },
+  { key: "book",   label: "Book",   Icon: Book },
+  { key: "custom", label: "Custom", Icon: Sparkles },
+];
 
 function CoverMosaic({ covers }: { covers: string[] }) {
   const filled = covers.slice(0, 4);
@@ -93,15 +113,15 @@ function AddToCollectionDialog({
   const [selectedStatus, setSelectedStatus] = useState<string>(defaultStatus);
   const [selectedCollection, setSelectedCollection] = useState<number | null>(null);
 
-  // Pick sensible collection to preselect: default collection matching status
-  const defaultCollections = ownerCollections.filter(c => c.isDefault && c.mediaGroup === getMediaGroup(item.mediaType));
+  // Match default collections by exact media type (e.g. "anime", "movie", "series", "manga", "book")
+  const exactGroup = getExactMediaGroup(item.mediaType);
+  const defaultCollections = ownerCollections.filter(c => c.isDefault && c.mediaGroup === exactGroup);
   const customCollections = ownerCollections.filter(c => !c.isDefault);
 
   const meta = OWNER_META[owner] || OWNER_META.together;
   const color = STATUS_COLORS[selectedStatus] ?? "hsl(220 8% 55%)";
 
   function handleAdd() {
-    // If a specific collection is selected, add there; otherwise add to the default collection matching the status
     if (selectedCollection !== null) {
       onAdd(selectedCollection, selectedStatus);
     } else {
@@ -215,33 +235,58 @@ function AddToCollectionDialog({
 
 // ── Library Mirror ────────────────────────────────────────────────────────────
 
-function LibraryMirror({ owner, ownerCollections }: { owner: string; ownerCollections: Collection[] }) {
+type SortMode = "recent" | "title" | "rating" | "year";
+
+function LibraryMirror({ owner, ownerCollections, mediaGroup }: { owner: string; ownerCollections: Collection[]; mediaGroup: "anime" | "book" }) {
   const { data: allItems } = useQuery<Item[]>({ queryKey: ["/api/items"] });
   const [search, setSearch] = useState("");
   const [addTarget, setAddTarget] = useState<Item | null>(null);
+  const [sortMode, setSortMode] = useState<SortMode>("recent");
+  const [subTypeFilter, setSubTypeFilter] = useState<string>("all");
+  // Track locally added items for instant visual feedback (itemId → collectionId)
+  const [addedItems, setAddedItems] = useState<Set<number>>(new Set());
   const { toast } = useToast();
   const qc = useQueryClient();
 
-  const filtered = (allItems || []).filter(i =>
-    !search || i.title.toLowerCase().includes(search.toLowerCase())
-  );
+  const ANIME_TYPES = ["anime", "movie", "series"];
+  const BOOK_TYPES = ["manga", "book"];
+  const SUB_TYPES = mediaGroup === "anime"
+    ? ["all", "anime", "movie", "series"]
+    : ["all", "manga", "book"];
+
+  const sorted = [...(allItems || [])].sort((a, b) => {
+    if (sortMode === "title") return a.title.localeCompare(b.title);
+    if (sortMode === "rating") return (b.rating ?? 0) - (a.rating ?? 0);
+    if (sortMode === "year") return (b.year ?? 0) - (a.year ?? 0);
+    return b.id - a.id; // recent
+  });
+
+  const filtered = sorted.filter(i => {
+    const typeMatch = mediaGroup === "anime"
+      ? ANIME_TYPES.includes(i.mediaType)
+      : BOOK_TYPES.includes(i.mediaType);
+    if (!typeMatch) return false;
+    if (subTypeFilter !== "all" && i.mediaType !== subTypeFilter) return false;
+    if (search && !i.title.toLowerCase().includes(search.toLowerCase())) return false;
+    return true;
+  });
 
   const addMutation = useMutation({
-    mutationFn: async ({ collectionId, status }: { collectionId: number; status: string }) => {
-      if (!addTarget) return;
+    mutationFn: async ({ collectionId, status, item }: { collectionId: number; status: string; item: Item }) => {
       await apiRequest("POST", `/api/collections/${collectionId}/items`, {
-        itemId: addTarget.id,
+        itemId: item.id,
         status,
       });
-      return { collectionId, status };
+      return { collectionId, status, item };
     },
     onSuccess: (result) => {
-      if (!result || !addTarget) return;
-      qc.setQueryData<any[]>(["/api/collections", result.collectionId, "items"], (old = []) => {
-        if (old.some(i => i.id === addTarget.id)) return old;
-        return [...old, { ...addTarget, collectionStatus: result.status }];
+      const { collectionId, status, item } = result;
+      qc.setQueryData<any[]>(["/api/collections", collectionId, "items"], (old = []) => {
+        if (old.some(i => i.id === item.id)) return old;
+        return [...old, { ...item, collectionStatus: status }];
       });
-      toast({ title: "Added!", description: `${addTarget.title} → ${STATUS_LABELS[result.status] ?? result.status}` });
+      setAddedItems(prev => new Set(prev).add(item.id));
+      toast({ title: "Added!", description: `${item.title} → ${STATUS_LABELS[status] ?? status}` });
     },
     onError: () => toast({ title: "Failed to add", variant: "destructive" }),
   });
@@ -252,8 +297,16 @@ function LibraryMirror({ owner, ownerCollections }: { owner: string; ownerCollec
     return <I size={20} className="text-muted-foreground/30" />;
   };
 
+  const SORT_LABELS: Record<SortMode, string> = {
+    recent: "Recent",
+    title: "Title",
+    rating: "Rating",
+    year: "Year",
+  };
+
   return (
     <div className="space-y-3">
+      {/* Search + Sort row */}
       <div className="flex items-center gap-2">
         <div className="relative flex-1">
           <SearchIcon size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
@@ -265,49 +318,109 @@ function LibraryMirror({ owner, ownerCollections }: { owner: string; ownerCollec
             data-testid="input-mirror-search"
           />
         </div>
+        {/* Sort dropdown */}
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <button
+              data-testid="button-mirror-sort"
+              className="flex items-center gap-1.5 h-8 px-2.5 rounded-lg border border-border text-[11px] text-muted-foreground hover:bg-secondary hover:text-foreground transition-colors shrink-0"
+            >
+              <ArrowUpDown size={11} />
+              {SORT_LABELS[sortMode]}
+            </button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-28">
+            {(["recent", "title", "rating", "year"] as SortMode[]).map(s => (
+              <DropdownMenuItem
+                key={s}
+                onClick={() => setSortMode(s)}
+                className="text-xs flex items-center justify-between"
+              >
+                {SORT_LABELS[s]}
+                {sortMode === s && <Check size={10} />}
+              </DropdownMenuItem>
+            ))}
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
+
+      {/* Sub-type filter pills */}
+      <div className="flex gap-1.5 flex-wrap">
+        {SUB_TYPES.map(t => (
+          <button
+            key={t}
+            data-testid={`filter-subtype-${t}`}
+            onClick={() => setSubTypeFilter(t)}
+            className={cn(
+              "text-[10px] px-2 py-0.5 rounded-full border transition-colors capitalize",
+              subTypeFilter === t
+                ? "border-primary/40 bg-primary/10 text-primary"
+                : "border-border text-muted-foreground hover:bg-secondary"
+            )}
+          >
+            {t === "all" ? "All" : t.charAt(0).toUpperCase() + t.slice(1)}
+          </button>
+        ))}
+        <span className="ml-auto text-[10px] text-muted-foreground/50 self-center">{filtered.length} item{filtered.length !== 1 ? "s" : ""}</span>
       </div>
 
       {(allItems || []).length === 0 ? (
         <p className="text-xs text-muted-foreground py-4 text-center">Library is empty. Add items via the search button.</p>
       ) : filtered.length === 0 ? (
-        <p className="text-xs text-muted-foreground py-4 text-center">No items match "{search}".</p>
+        <p className="text-xs text-muted-foreground py-4 text-center">
+          {search ? `No results for "${search}".` : `No ${subTypeFilter !== "all" ? subTypeFilter : (mediaGroup === "anime" ? "anime, movies or series" : "manga or books")} in the library yet.`}
+        </p>
       ) : (
         <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-7 gap-2">
-          {filtered.map((item) => (
-            <button
-              key={item.id}
-              data-testid={`mirror-item-${item.id}`}
-              onClick={() => setAddTarget(item)}
-              className="group relative rounded-lg overflow-hidden bg-card border border-border hover:border-primary/50 hover:shadow-lg transition-all duration-200 text-left"
-              title={`Add "${item.title}" to ${meta.emoji} collection`}
-            >
-              <div className="relative aspect-[2/3] bg-secondary">
-                {item.coverUrl ? (
-                  <img
-                    src={item.coverUrl}
-                    alt={item.title}
-                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                    loading="lazy"
-                    onError={e => { (e.target as HTMLImageElement).style.display = "none"; }}
-                  />
-                ) : (
-                  <div className="absolute inset-0 flex items-center justify-center">
-                    {Icon(item.mediaType)}
-                  </div>
+          {filtered.map((item) => {
+            const isAdded = addedItems.has(item.id);
+            return (
+              <button
+                key={item.id}
+                data-testid={`mirror-item-${item.id}`}
+                onClick={() => setAddTarget(item)}
+                className={cn(
+                  "group relative rounded-lg overflow-hidden bg-card border transition-all duration-200 text-left",
+                  isAdded
+                    ? "border-primary/60 shadow-[0_0_0_1px_hsl(var(--primary)/0.3)]"
+                    : "border-border hover:border-primary/50 hover:shadow-lg"
                 )}
-                {/* Add overlay */}
-                <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-colors duration-200 flex items-center justify-center">
-                  <Plus
-                    size={20}
-                    className="text-white opacity-0 group-hover:opacity-100 transition-opacity duration-200 drop-shadow-lg"
-                  />
+                title={`Add "${item.title}" to ${meta.emoji} collection`}
+              >
+                <div className="relative aspect-[2/3] bg-secondary">
+                  {item.coverUrl ? (
+                    <img
+                      src={item.coverUrl}
+                      alt={item.title}
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                      loading="lazy"
+                      onError={e => { (e.target as HTMLImageElement).style.display = "none"; }}
+                    />
+                  ) : (
+                    <div className="absolute inset-0 flex items-center justify-center">
+                      {Icon(item.mediaType)}
+                    </div>
+                  )}
+                  {/* Added badge */}
+                  {isAdded && (
+                    <div className="absolute top-1 right-1 w-4 h-4 rounded-full bg-primary flex items-center justify-center shadow-md">
+                      <Check size={9} className="text-white" />
+                    </div>
+                  )}
+                  {/* Add overlay on hover */}
+                  <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-colors duration-200 flex items-center justify-center">
+                    <Plus
+                      size={20}
+                      className="text-white opacity-0 group-hover:opacity-100 transition-opacity duration-200 drop-shadow-lg"
+                    />
+                  </div>
                 </div>
-              </div>
-              <div className="px-1.5 py-1.5">
-                <p className="text-[10px] font-medium text-foreground leading-tight line-clamp-2">{item.title}</p>
-              </div>
-            </button>
-          ))}
+                <div className="px-1.5 py-1.5">
+                  <p className="text-[10px] font-medium text-foreground leading-tight line-clamp-2">{item.title}</p>
+                </div>
+              </button>
+            );
+          })}
         </div>
       )}
 
@@ -319,8 +432,9 @@ function LibraryMirror({ owner, ownerCollections }: { owner: string; ownerCollec
           owner={owner}
           ownerCollections={ownerCollections}
           onAdd={(collectionId, status) => {
-            addMutation.mutate({ collectionId, status });
+            const item = addTarget;
             setAddTarget(null);
+            addMutation.mutate({ collectionId, status, item });
           }}
         />
       )}
@@ -409,7 +523,7 @@ function CreateEditDialog({
 // ── Collection Card ────────────────────────────────────────────────────────────
 
 function CollectionCard({
-  col, meta, isDefault, onEdit, onDelete, onClick,
+  col, meta, isDefault, onEdit, onDelete, onClick, itemsData,
 }: {
   col: Collection;
   meta: typeof OWNER_META[string];
@@ -417,11 +531,14 @@ function CollectionCard({
   onEdit: () => void;
   onDelete: () => void;
   onClick: () => void;
+  itemsData?: any[];
 }) {
+  // Use prefetched items data if provided, otherwise fall back to cache
   const qc = useQueryClient();
-  const covers = (qc.getQueryData<any[]>(["/api/collections", col.id, "items"]) || [])
+  const cachedItems = itemsData ?? (qc.getQueryData<any[]>(["/api/collections", col.id, "items"]) || []);
+  const covers = cachedItems
     .filter((i: any) => !!i.coverUrl).map((i: any) => i.coverUrl as string).slice(0, 4);
-  const count = (qc.getQueryData<any[]>(["/api/collections", col.id, "items"]) || []).length;
+  const count = cachedItems.length;
   const statusColor = col.defaultStatus ? (STATUS_COLORS[col.defaultStatus] ?? null) : null;
 
   return (
@@ -430,7 +547,7 @@ function CollectionCard({
       className={cn(
         "group relative rounded-2xl border border-border bg-card p-4",
         "hover:shadow-xl transition-all duration-300 cursor-pointer",
-        "animate-card-in"
+        "animate-card-rise hover-glow"
       )}
       onClick={onClick}
       onMouseEnter={e => {
@@ -461,9 +578,9 @@ function CollectionCard({
                   <Layers size={9} />
                   {count} item{count !== 1 ? "s" : ""}
                 </p>
-                {isDefault && (
-                  <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-secondary text-muted-foreground">
-                    {MEDIA_GROUP_LABELS[col.mediaGroup ?? ""] ?? col.mediaGroup}
+                {isDefault && col.mediaGroup && (
+                  <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-secondary text-muted-foreground capitalize">
+                    {col.mediaGroup}
                   </span>
                 )}
               </div>
@@ -512,6 +629,7 @@ export default function OwnerCollectionsPage({ owner }: { owner: string }) {
   const [editTarget, setEditTarget] = useState<Collection | null>(null);
   const [showMirror, setShowMirror] = useState(false);
   const [mirrorMediaGroup, setMirrorMediaGroup] = useState<"anime" | "book">("anime");
+  const [activeTab, setActiveTab] = useState<TabKey>("anime");
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   const qc = useQueryClient();
@@ -527,16 +645,36 @@ export default function OwnerCollectionsPage({ owner }: { owner: string }) {
   });
 
   const cols = collections || [];
-  const defaultAnimeCols = cols.filter(c => c.isDefault && c.mediaGroup === "anime")
-    .sort((a, b) => {
-      const order = ["watching", "completed", "want_to_rewatch", "dropped"];
-      return order.indexOf(a.defaultStatus ?? "") - order.indexOf(b.defaultStatus ?? "");
-    });
-  const defaultBookCols = cols.filter(c => c.isDefault && c.mediaGroup === "book")
-    .sort((a, b) => {
-      const order = ["reading", "completed", "wishlist", "owned"];
-      return order.indexOf(a.defaultStatus ?? "") - order.indexOf(b.defaultStatus ?? "");
-    });
+
+  // Prefetch items for ALL collections so CoverMosaic always has data
+  const itemQueries = useQueries({
+    queries: cols.map(col => ({
+      queryKey: ["/api/collections", col.id, "items"],
+      queryFn: async () => {
+        const base = API_BASE;
+        const res = await fetch(`${base}/api/collections/${col.id}/items`);
+        return res.json();
+      },
+      staleTime: 60_000,
+    })),
+  });
+
+  // Build a map of collectionId → items array (from prefetched queries)
+  const itemsByColId: Record<number, any[]> = {};
+  cols.forEach((col, idx) => {
+    const q = itemQueries[idx];
+    if (q?.data) itemsByColId[col.id] = q.data;
+  });
+
+  // Per-type default collections (5 sections: anime / movie / series / manga / book)
+  const defaultColsByType = (type: string) =>
+    cols.filter(c => c.isDefault && c.mediaGroup === type)
+      .sort((a, b) => {
+        const section = MEDIA_TYPE_SECTIONS.find(s => s.key === type);
+        const order = section?.statusOrder ?? [];
+        return order.indexOf(a.defaultStatus ?? "") - order.indexOf(b.defaultStatus ?? "");
+      });
+
   const customCols = cols.filter(c => !c.isDefault);
 
   const deleteMutation = useMutation({
@@ -551,12 +689,16 @@ export default function OwnerCollectionsPage({ owner }: { owner: string }) {
     onError: () => toast({ title: "Cannot delete a default collection", variant: "destructive" }),
   });
 
-  const mirrorCols = showMirror
-    ? cols.filter(c => c.mediaGroup === mirrorMediaGroup || !c.isDefault)
-    : [];
+  // For mirror: pass all default collections matching the broad group + all custom
+  const ANIME_BROAD = ["anime", "movie", "series"];
+  const BOOK_BROAD  = ["manga", "book"];
+  const mirrorOwnerCols = cols.filter(c =>
+    !c.isDefault ||
+    (mirrorMediaGroup === "anime" ? ANIME_BROAD : BOOK_BROAD).includes(c.mediaGroup ?? "")
+  );
 
   return (
-    <div className="max-w-3xl animate-page-in space-y-8">
+    <div className="max-w-3xl animate-page-in space-y-6">
       {/* ── Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
@@ -582,7 +724,7 @@ export default function OwnerCollectionsPage({ owner }: { owner: string }) {
             {showMirror ? "Hide library" : "Add from library"}
           </Button>
           <Button
-            onClick={() => setCreateOpen(true)}
+            onClick={() => { setActiveTab("custom"); setCreateOpen(true); }}
             size="sm"
             data-testid="button-new-collection"
             className="gap-1.5 text-white border-none"
@@ -618,114 +760,114 @@ export default function OwnerCollectionsPage({ owner }: { owner: string }) {
           </div>
           <LibraryMirror
             owner={owner}
-            ownerCollections={cols.filter(c =>
-              !c.isDefault || c.mediaGroup === mirrorMediaGroup
-            )}
+            mediaGroup={mirrorMediaGroup}
+            ownerCollections={mirrorOwnerCols}
           />
         </div>
       )}
 
-      {/* ── Anime/Movie/Series collections */}
-      {defaultAnimeCols.length > 0 && (
-        <section className="space-y-3">
-          <div className="flex items-center gap-2">
-            <Star size={13} className="text-muted-foreground" />
-            <h2 className="text-xs font-semibold text-muted-foreground uppercase tracking-widest">
-              Anime · Movie · Series
-            </h2>
-          </div>
-          <div className="grid gap-3 sm:grid-cols-2">
-            {defaultAnimeCols.map((col, idx) => (
-              <CollectionCard
-                key={col.id}
-                col={col}
-                meta={meta}
-                isDefault
-                onEdit={() => {}}
-                onDelete={() => {}}
-                onClick={() => setLocation(`/collections/${col.id}`)}
-              />
-            ))}
-          </div>
-        </section>
-      )}
-
-      {/* ── Manga/Book collections */}
-      {defaultBookCols.length > 0 && (
-        <section className="space-y-3">
-          <div className="flex items-center gap-2">
-            <BookOpen size={13} className="text-muted-foreground" />
-            <h2 className="text-xs font-semibold text-muted-foreground uppercase tracking-widest">
-              Manga · Book
-            </h2>
-          </div>
-          <div className="grid gap-3 sm:grid-cols-2">
-            {defaultBookCols.map((col, idx) => (
-              <CollectionCard
-                key={col.id}
-                col={col}
-                meta={meta}
-                isDefault
-                onEdit={() => {}}
-                onDelete={() => {}}
-                onClick={() => setLocation(`/collections/${col.id}`)}
-              />
-            ))}
-          </div>
-        </section>
-      )}
-
-      {/* ── Custom collections */}
-      <section className="space-y-3">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Sparkles size={13} className="text-muted-foreground" />
-            <h2 className="text-xs font-semibold text-muted-foreground uppercase tracking-widest">
-              Custom collections
-            </h2>
-          </div>
-        </div>
-
-        {customCols.length === 0 && (
-          <div className="flex flex-col items-center justify-center py-10 text-center text-muted-foreground">
-            <div className="text-4xl mb-3 animate-wiggle">{meta.emoji}</div>
-            <p className="font-semibold text-foreground text-sm mb-1.5">No custom collections yet</p>
-            <p className="text-xs max-w-[220px] leading-relaxed mb-4">{meta.emptyMsg}</p>
-            <Button
-              onClick={() => setCreateOpen(true)}
-              size="sm"
-              variant="outline"
-              className="gap-1.5"
+      {/* ── Tab bar: Anime | Movie | Series | Manga | Book | Custom */}
+      <div className="flex gap-1 overflow-x-auto pb-1 scrollbar-hide">
+        {COLLECTION_TABS.map(tab => {
+          const Icon = tab.Icon;
+          const isActive = activeTab === tab.key;
+          return (
+            <button
+              key={tab.key}
+              data-testid={`tab-collections-${tab.key}`}
+              onClick={() => setActiveTab(tab.key)}
+              className={cn(
+                "flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-all duration-200 shrink-0",
+                isActive
+                  ? "text-white shadow-sm"
+                  : "text-muted-foreground hover:text-foreground hover:bg-secondary/60"
+              )}
+              style={isActive ? { background: meta.accent, boxShadow: `0 2px 10px ${meta.accent}44` } : {}}
             >
-              <Plus size={13} />
-              Create first collection
-            </Button>
-          </div>
-        )}
+              <Icon size={12} />
+              {tab.label}
+            </button>
+          );
+        })}
+      </div>
 
-        {customCols.length > 0 && (
-          <div className="grid gap-3 sm:grid-cols-2">
-            {customCols.map((col, idx) => (
-              <CollectionCard
-                key={col.id}
-                col={col}
-                meta={meta}
-                isDefault={false}
-                onEdit={() => setEditTarget(col)}
-                onDelete={() => deleteMutation.mutate(col.id)}
-                onClick={() => setLocation(`/collections/${col.id}`)}
-              />
-            ))}
-          </div>
-        )}
-      </section>
-
-      {isLoading && (
+      {/* ── Tab content */}
+      {isLoading ? (
         <div className="grid gap-3 sm:grid-cols-2">
           {[1, 2, 3, 4].map(i => (
             <div key={i} className="h-28 skeleton rounded-2xl" />
           ))}
         </div>
+      ) : activeTab === "custom" ? (
+        /* ── Custom tab */
+        <section className="space-y-3">
+          {customCols.length === 0 && (
+            <div className="flex flex-col items-center justify-center py-10 text-center text-muted-foreground">
+              <div className="text-4xl mb-3 animate-float emoji-pop">{meta.emoji}</div>
+              <p className="font-semibold text-foreground text-sm mb-1.5">No custom collections yet</p>
+              <p className="text-xs max-w-[220px] leading-relaxed mb-4">{meta.emptyMsg}</p>
+              <Button
+                onClick={() => setCreateOpen(true)}
+                size="sm"
+                variant="outline"
+                className="gap-1.5"
+              >
+                <Plus size={13} />
+                Create first collection
+              </Button>
+            </div>
+          )}
+
+          {customCols.length > 0 && (
+            <div className="grid gap-3 sm:grid-cols-2">
+              {customCols.map((col) => (
+                <CollectionCard
+                  key={col.id}
+                  col={col}
+                  meta={meta}
+                  isDefault={false}
+                  itemsData={itemsByColId[col.id]}
+                  onEdit={() => setEditTarget(col)}
+                  onDelete={() => deleteMutation.mutate(col.id)}
+                  onClick={() => setLocation(`/collections/${col.id}`)}
+                />
+              ))}
+            </div>
+          )}
+        </section>
+      ) : (
+        /* ── Media type tab (anime / movie / series / manga / book) */
+        <section className="space-y-3">
+          {(() => {
+            const typeCols = defaultColsByType(activeTab);
+            const section = MEDIA_TYPE_SECTIONS.find(s => s.key === activeTab)!;
+            const Icon = section.Icon;
+            if (typeCols.length === 0) {
+              return (
+                <div className="flex flex-col items-center justify-center py-10 text-center text-muted-foreground">
+                  <Icon size={32} className="mb-3 opacity-20" />
+                  <p className="text-sm text-muted-foreground/60">No {section.label} collections yet</p>
+                </div>
+              );
+            }
+            return (
+              <div className="grid gap-3 sm:grid-cols-2">
+                {typeCols.map((col) => (
+                  <CollectionCard
+                    key={col.id}
+                    col={col}
+                    meta={meta}
+                    isDefault
+                    itemsData={itemsByColId[col.id]}
+                    onEdit={() => {}}
+                    onDelete={() => {}}
+                    onClick={() => setLocation(`/collections/${col.id}`)}
+                  />
+                ))}
+              </div>
+            );
+          })()}
+        </section>
       )}
 
       <CreateEditDialog open={createOpen} onOpenChange={setCreateOpen} owner={owner} />

@@ -101,19 +101,11 @@ export default function ItemCard({
             </div>
           )}
 
-          {/* Bottom gradient overlay */}
-          <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+          {/* Bottom gradient overlay — always visible */}
+          <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/10 to-transparent" />
 
-          {/* Rating badge */}
-          {item.rating && (
-            <div className="absolute top-2 right-2 flex items-center gap-0.5 bg-black/70 backdrop-blur-sm rounded px-1.5 py-0.5">
-              <Star size={9} className="text-yellow-400 fill-yellow-400" />
-              <span className="text-white text-[10px] font-semibold leading-none">{item.rating}</span>
-            </div>
-          )}
-
-          {/* Hover: quick actions overlay */}
-          <div className="absolute bottom-2 left-2 right-2 flex items-center justify-between opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+          {/* Quick actions — always visible */}
+          <div className="absolute bottom-2 left-2 right-2 flex items-center justify-between">
             {/* Status pill (collection context only) */}
             {statusColor && statusLabel ? (
               <span

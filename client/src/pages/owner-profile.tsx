@@ -10,6 +10,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { BarChart3, Edit3, Check, X, Star, Zap, BookOpen, Tv, Film, ScrollText, Sparkles } from "lucide-react";
 import { cn } from "@/lib/utils";
 
+
 const EMOJI_OPTIONS = [
   "🐻","🌸","🫶","🌙","⚡","🔥","🌊","🍄","🐉","🦋",
   "🎭","🌺","🦊","🐺","🐙","🌹","💀","🎪","🤖","🐸",
@@ -235,10 +236,6 @@ export default function OwnerProfilePage({ owner }: { owner: string }) {
   const items = allItems || [];
   const total = items.length;
   const completed = items.filter(i => i.status === "completed").length;
-  const rated = items.filter(i => i.rating != null);
-  const avgRating = rated.length > 0
-    ? (rated.reduce((s, i) => s + (i.rating ?? 0), 0) / rated.length).toFixed(1)
-    : null;
   const collectionCount = (collections || []).length;
 
   const byType = ["anime", "manga", "movie", "series", "book"].map(t => ({
@@ -262,9 +259,9 @@ export default function OwnerProfilePage({ owner }: { owner: string }) {
 
         {/* Content */}
         <div className="relative z-10 p-6 flex items-end gap-5 pt-12">
-          {/* Avatar */}
+          {/* Avatar — heartbeat on hover */}
           <div
-            className="w-20 h-20 rounded-2xl flex items-center justify-center text-4xl shadow-xl border-2 border-white/10 shrink-0"
+            className="w-20 h-20 rounded-2xl flex items-center justify-center text-4xl shadow-xl border-2 border-white/10 shrink-0 cursor-default select-none emoji-pop"
             style={{ background: banner, boxShadow: `0 0 30px ${accent}66` }}
           >
             {profile.avatarEmoji || "🐻"}
@@ -329,7 +326,6 @@ export default function OwnerProfilePage({ owner }: { owner: string }) {
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           <StatCard value={total} label="In library" color={accent} />
           <StatCard value={completed} label="Completed" color={accent} />
-          <StatCard value={avgRating ? `★ ${avgRating}` : "—"} label="Avg rating" color={accent} />
           <StatCard value={collectionCount} label="Collections" color={accent} />
         </div>
 

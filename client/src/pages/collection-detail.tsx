@@ -207,10 +207,10 @@ export default function CollectionDetailPage() {
 
   const itemList = items || [];
 
-  // Back destination: owner collections page if collection has an owner
+  // Back destination: go directly to the collections tab of the owner (preserves nav state)
   const backPath = collection?.owner
-    ? (collection.owner === "jack" ? "/jack" : collection.owner === "sally" ? "/sally" : "/together")
-    : "/collections";
+    ? `/${collection.owner}/collections`
+    : "/library";
 
   return (
     <div className="animate-page-in space-y-6">
@@ -222,7 +222,7 @@ export default function CollectionDetailPage() {
           className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors mb-4"
         >
           <ArrowLeft size={14} />
-          {collection?.owner === "jack" ? "Jack" : collection?.owner === "sally" ? "Sally" : collection?.owner === "together" ? "Together" : "Collections"}
+          {collection?.owner === "jack" ? "Jack's Collections" : collection?.owner === "sally" ? "Sally's Collections" : collection?.owner === "together" ? "Together's Watchlists" : "Collections"}
         </button>
 
         <div className="flex items-start justify-between gap-4">

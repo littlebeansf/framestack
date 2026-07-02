@@ -176,3 +176,122 @@
 ::-webkit-scrollbar { width: 5px; height: 5px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: hsl(var(--border)); border-radius: 99px; }
+
+/* ── Floating particles background ──────────────────────────────────────────── */
+@keyframes float-particle {
+  0%   { transform: translateY(0px) translateX(0px) scale(1); opacity: 0; }
+  10%  { opacity: 1; }
+  90%  { opacity: 0.6; }
+  100% { transform: translateY(-100vh) translateX(var(--dx, 20px)) scale(0.5); opacity: 0; }
+}
+.particle {
+  position: fixed;
+  pointer-events: none;
+  z-index: 0;
+  border-radius: 50%;
+  animation: float-particle var(--dur, 12s) ease-in-out var(--delay, 0s) infinite;
+  will-change: transform, opacity;
+}
+
+/* ── Nav item hover wiggle ───────────────────────────────────────────────────── */
+@keyframes nav-bounce {
+  0%, 100% { transform: scale(1); }
+  40%       { transform: scale(1.08) translateY(-1px); }
+  70%       { transform: scale(0.96); }
+}
+.nav-item-hover:hover { animation: nav-bounce 0.35s cubic-bezier(0.34,1.5,0.64,1) both; }
+
+/* ── Btn bounce (tab switches) ───────────────────────────────────────────────── */
+@keyframes btn-tap {
+  0%   { transform: scale(1); }
+  40%  { transform: scale(0.92); }
+  70%  { transform: scale(1.05); }
+  100% { transform: scale(1); }
+}
+.btn-bounce:active { animation: btn-tap 0.22s cubic-bezier(0.34,1.56,0.64,1) both; }
+
+/* ── Staggered card entrance ─────────────────────────────────────────────────── */
+@keyframes card-rise {
+  from { opacity: 0; transform: translateY(18px) scale(0.96); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+.animate-card-rise {
+  animation: card-rise 0.45s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+/* ── Heartbeat pulse (avatar / emoji) ───────────────────────────────────────── */
+@keyframes heartbeat {
+  0%, 100% { transform: scale(1); }
+  14%       { transform: scale(1.18); }
+  28%       { transform: scale(1); }
+  42%       { transform: scale(1.12); }
+  70%       { transform: scale(1); }
+}
+.animate-heartbeat { animation: heartbeat 1.6s ease-in-out; }
+.animate-heartbeat-loop { animation: heartbeat 2.4s ease-in-out infinite; }
+
+/* ── Sparkle pop (add confirmation) ─────────────────────────────────────────── */
+@keyframes sparkle-pop {
+  0%   { opacity: 0; transform: scale(0) rotate(0deg); }
+  50%  { opacity: 1; transform: scale(1.4) rotate(20deg); }
+  100% { opacity: 0; transform: scale(0.8) rotate(40deg); }
+}
+.animate-sparkle { animation: sparkle-pop 0.6s ease-out forwards; }
+
+/* ── Gentle float (decorative elements) ─────────────────────────────────────── */
+@keyframes gentle-float {
+  0%, 100% { transform: translateY(0px) rotate(0deg); }
+  33%       { transform: translateY(-6px) rotate(2deg); }
+  66%       { transform: translateY(-3px) rotate(-1deg); }
+}
+.animate-float { animation: gentle-float 4s ease-in-out infinite; }
+.animate-float-slow { animation: gentle-float 7s ease-in-out infinite; }
+.animate-float-fast { animation: gentle-float 2.5s ease-in-out infinite; }
+
+/* ── Slide-in from bottom (collection cards) ────────────────────────────────── */
+@keyframes slide-up-in {
+  from { opacity: 0; transform: translateY(24px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.animate-slide-up { animation: slide-up-in 0.4s cubic-bezier(0.22,1,0.36,1) both; }
+
+/* ── Shimmer glow on hover ───────────────────────────────────────────────────── */
+@keyframes shimmer-glow {
+  0%, 100% { box-shadow: 0 0 0 0 transparent; }
+  50%       { box-shadow: 0 0 18px 2px hsl(var(--primary) / 0.35); }
+}
+.hover-glow:hover { animation: shimmer-glow 1.2s ease-in-out; }
+
+/* ── Page fade-slide (page transitions) ─────────────────────────────────────── */
+@keyframes page-enter {
+  from { opacity: 0; transform: translateY(20px) scale(0.985); filter: blur(2px); }
+  to   { opacity: 1; transform: translateY(0) scale(1); filter: blur(0); }
+}
+.animate-page-in { animation: page-enter 0.45s cubic-bezier(0.22, 1, 0.36, 1) both; }
+
+/* ── Emoji pop on interaction ────────────────────────────────────────────────── */
+@keyframes emoji-pop {
+  0%   { transform: scale(1); }
+  30%  { transform: scale(1.35) rotate(-8deg); }
+  60%  { transform: scale(0.9) rotate(5deg); }
+  100% { transform: scale(1) rotate(0deg); }
+}
+.emoji-pop:hover { animation: emoji-pop 0.4s cubic-bezier(0.34,1.56,0.64,1); }
+
+/* ── Owner page intro bounce ──────────────────────────────────────────────── */
+@keyframes owner-intro {
+  0%   { opacity: 0; transform: scale(0.3) rotate(-15deg); }
+  40%  { opacity: 1; transform: scale(1.25) rotate(8deg); }
+  65%  { transform: scale(0.9) rotate(-4deg); }
+  82%  { transform: scale(1.08) rotate(2deg); }
+  100% { opacity: 0; transform: scale(0.85) rotate(0deg); }
+}
+
+/* ── Search button pulse ─────────────────────────────────────────────────────── */
+@keyframes search-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 hsl(var(--primary) / 0); }
+  50%       { box-shadow: 0 0 0 4px hsl(var(--primary) / 0.18); }
+}
+.search-pulse:focus-within { animation: search-pulse 2s ease-in-out infinite; }
+
+/* ── Badge type colours (existing, ensure defined) ──────────────────────────── */

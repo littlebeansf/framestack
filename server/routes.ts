@@ -281,6 +281,84 @@ export async function registerRoutes(httpServer: Server, app: Express) {
     } catch (err: any) { res.status(500).json({ error: err.message }); }
   });
 
+  // ─── Link Lists ─────────────────────────────────────────────────────────────────
+
+  app.get("/api/link-lists", (_req, res) => {
+    res.json(storage.getAllLinkLists());
+  });
+
+  app.post("/api/link-lists", (req, res) => {
+    try {
+      const { name, emoji } = req.body;
+      if (!name?.trim()) return res.status(400).json({ error: "name required" });
+      res.json(storage.createLinkList({ name: name.trim(), emoji: emoji ?? null, createdAt: Date.now() }));
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  app.patch("/api/link-lists/:id", (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (!storage.getLinkListById(id)) return res.status(404).json({ error: "Not found" });
+      res.json(storage.updateLinkList(id, req.body));
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  app.delete("/api/link-lists/:id", (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (!storage.getLinkListById(id)) return res.status(404).json({ error: "Not found" });
+      storage.deleteLinkList(id); // cascades links
+      res.json({ ok: true });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // ─── Links (scoped to a list) ──────────────────────────────────────────────────
+
+  app.get("/api/link-lists/:listId/links", (req, res) => {
+    res.json(storage.getLinksByList(parseInt(req.params.listId)));
+  });
+
+  app.post("/api/link-lists/:listId/links", (req, res) => {
+    try {
+      const listId = parseInt(req.params.listId);
+      if (!storage.getLinkListById(listId)) return res.status(404).json({ error: "List not found" });
+      const { url, title, description, addedBy } = req.body;
+      if (!url?.trim() || !title?.trim()) return res.status(400).json({ error: "url and title required" });
+      let favicon: string | null = null;
+      try { favicon = `${new URL(url).origin}/favicon.ico`; } catch {}
+      res.json(storage.createLink({ listId, url: url.trim(), title: title.trim(), description: description?.trim() ?? null, favicon, addedBy: addedBy ?? null, createdAt: Date.now() }));
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  app.patch("/api/links/:id", (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (!storage.getLinkById(id)) return res.status(404).json({ error: "Not found" });
+      res.json(storage.updateLink(id, req.body));
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  app.delete("/api/links/:id", (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (!storage.getLinkById(id)) return res.status(404).json({ error: "Not found" });
+      storage.deleteLink(id);
+      res.json({ ok: true });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
   // books alias
   app.get("/api/search/books", async (req, res) => {
     req.url = req.url.replace("/books", "/book");

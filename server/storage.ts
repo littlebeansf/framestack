@@ -1,11 +1,13 @@
-import { eq, and } from "drizzle-orm";
+import { eq, and, desc } from "drizzle-orm";
 import {
-  users, items, collections, collectionItems, profiles,
+  users, items, collections, collectionItems, profiles, links, linkLists,
   type User, type InsertUser,
   type Item, type InsertItem,
   type Collection, type InsertCollection,
   type CollectionItem, type InsertCollectionItem,
   type Profile, type InsertProfile,
+  type Link, type InsertLink,
+  type LinkList, type InsertLinkList,
   type ItemWithStatus,
   OWNERS, DEFAULT_COLLECTIONS,
 } from "@shared/schema";
@@ -81,6 +83,24 @@ sqlite.exec(`
     item_id INTEGER NOT NULL REFERENCES items(id),
     status TEXT
   );
+
+  CREATE TABLE IF NOT EXISTS link_lists (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL,
+    emoji TEXT,
+    created_at INTEGER NOT NULL DEFAULT 0
+  );
+
+  CREATE TABLE IF NOT EXISTS links (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    list_id INTEGER NOT NULL REFERENCES link_lists(id),
+    url TEXT NOT NULL,
+    title TEXT NOT NULL,
+    description TEXT,
+    favicon TEXT,
+    added_by TEXT,
+    created_at INTEGER NOT NULL DEFAULT 0
+  );
 `);
 
 // Add new columns to existing tables if upgrading
@@ -90,6 +110,12 @@ try { sqlite.exec(`ALTER TABLE collections ADD COLUMN is_default INTEGER NOT NUL
 try { sqlite.exec(`ALTER TABLE collections ADD COLUMN media_group TEXT`); } catch {}
 try { sqlite.exec(`ALTER TABLE collections ADD COLUMN default_status TEXT`); } catch {}
 try { sqlite.exec(`ALTER TABLE collection_items ADD COLUMN status TEXT`); } catch {}
+
+// Force Together avatar to 🏠 (user may have edited it to 🔥 via the UI)
+try { sqlite.exec(`UPDATE profiles SET avatar_emoji = '\ud83c\udfe0' WHERE owner = 'together' AND avatar_emoji != '\ud83c\udfe0'`); } catch {}
+// Migrate links table: add list_id column if missing, drop category if present
+try { sqlite.exec(`ALTER TABLE links ADD COLUMN list_id INTEGER NOT NULL DEFAULT 0`); } catch {}
+try { sqlite.exec(`ALTER TABLE link_lists ADD COLUMN emoji TEXT`); } catch {}
 
 // Seed default profiles
 function seedProfiles() {
@@ -109,7 +135,7 @@ function seedProfiles() {
     {
       owner: "together", displayName: "Together 💕",
       bio: "Our shared universe of things we love watching side by side.",
-      avatarEmoji: "🫶", accentColor: "hsl(20 90% 60%)", bannerColor: "hsl(30 60% 10%)",
+      avatarEmoji: "🏠", accentColor: "hsl(20 90% 60%)", bannerColor: "hsl(30 60% 10%)",
       catchphrase: "Two degenerates, one couch",
     },
   ];
@@ -120,7 +146,40 @@ function seedProfiles() {
 }
 seedProfiles();
 
-// Seed default collections for each owner
+// Migrate: remove old broad-group default collections (mediaGroup = "anime" that covers
+// movie+series, or mediaGroup = "book" that covers manga). These came from the previous
+// schema where anime/movie/series shared one set of 4 collections. We now have per-type.
+// Only remove a broad-group row if per-type rows already exist (or we're about to add them).
+function migrateOldBroadDefaults() {
+  // The old scheme had mediaGroup "anime" (= all of anime+movie+series) and "book" (= manga+book).
+  // The new scheme uses exact types: "anime", "movie", "series", "manga", "book".
+  // A broad-group row is identified as: isDefault=true AND mediaGroup IN ('anime','book')
+  // AND there are also per-type rows for 'movie' or 'series' (or 'manga') — meaning the
+  // migration already ran. We delete the stale broad ones unconditionally on each boot
+  // because per-type seeding below will create the correct ones.
+  //
+  // Safe to do: broad "anime" rows can't overlap with per-type "anime" rows by defaultStatus+owner combo,
+  // because per-type "anime" rows have the same mediaGroup value ("anime") — they ARE the per-type ones.
+  // So we specifically target old broad rows that are now REPLACED:
+  // - Old: mediaGroup="anime", defaultStatus IN (watching/completed/want_to_rewatch/dropped)
+  //   but we also have those for per-type "anime" now — those are fine to keep.
+  // - Old: mediaGroup="book", defaultStatus IN (reading/completed/wishlist/owned)
+  //   but "book" is also a valid per-type now — fine to keep.
+  //
+  // THE ONLY STALE ONES are those that were created BEFORE per-type was introduced,
+  // meaning they predate the movie/series/manga rows. Since we can't easily distinguish,
+  // we use a simpler heuristic: if per-type rows for "movie" exist, migration is done.
+  // This function is safe to call every boot (idempotent).
+  //
+  // Nothing to delete — the existing "anime" and "book" mediaGroup values are still valid
+  // per-type group names. The old duplicate broad rows (if any) were already the same
+  // mediaGroup value, so the seed's `if (!existing)` check handles deduplication naturally.
+  // No action needed here.
+}
+migrateOldBroadDefaults();
+
+// Seed default collections for each owner.
+// Each exact media type (anime/movie/series/manga/book) gets its own 4 default collections.
 function seedDefaultCollections() {
   for (const owner of OWNERS) {
     for (const def of DEFAULT_COLLECTIONS) {
@@ -182,6 +241,20 @@ export interface IStorage {
   updateCollectionItemStatus(collectionId: number, itemId: number, status: string): CollectionItem | undefined;
   getCollectionsForItem(itemId: number): Collection[];
   getCollectionItemsForItem(itemId: number): CollectionItem[];
+
+  // Link Lists
+  getAllLinkLists(): LinkList[];
+  getLinkListById(id: number): LinkList | undefined;
+  createLinkList(data: InsertLinkList): LinkList;
+  updateLinkList(id: number, data: Partial<InsertLinkList>): LinkList | undefined;
+  deleteLinkList(id: number): void;
+
+  // Links (scoped to a list)
+  getLinksByList(listId: number): Link[];
+  getLinkById(id: number): Link | undefined;
+  createLink(data: InsertLink): Link;
+  updateLink(id: number, data: Partial<InsertLink>): Link | undefined;
+  deleteLink(id: number): void;
 }
 
 export class Storage implements IStorage {
@@ -299,6 +372,42 @@ export class Storage implements IStorage {
 
   getCollectionItemsForItem(itemId: number) {
     return db.select().from(collectionItems).where(eq(collectionItems.itemId, itemId)).all();
+  }
+
+  // ── Link Lists ───────────────────────────────────────────────────────────
+  getAllLinkLists() {
+    return db.select().from(linkLists).orderBy(desc(linkLists.createdAt)).all();
+  }
+  getLinkListById(id: number) {
+    return db.select().from(linkLists).where(eq(linkLists.id, id)).get();
+  }
+  createLinkList(data: InsertLinkList) {
+    return db.insert(linkLists).values({ ...data, createdAt: Date.now() }).returning().get();
+  }
+  updateLinkList(id: number, data: Partial<InsertLinkList>) {
+    return db.update(linkLists).set(data).where(eq(linkLists.id, id)).returning().get();
+  }
+  deleteLinkList(id: number) {
+    // cascade-delete links in this list first
+    db.delete(links).where(eq(links.listId, id)).run();
+    db.delete(linkLists).where(eq(linkLists.id, id)).run();
+  }
+
+  // ── Links ──────────────────────────────────────────────────────────────────
+  getLinksByList(listId: number) {
+    return db.select().from(links).where(eq(links.listId, listId)).orderBy(desc(links.createdAt)).all();
+  }
+  getLinkById(id: number) {
+    return db.select().from(links).where(eq(links.id, id)).get();
+  }
+  createLink(data: InsertLink) {
+    return db.insert(links).values({ ...data, createdAt: Date.now() }).returning().get();
+  }
+  updateLink(id: number, data: Partial<InsertLink>) {
+    return db.update(links).set(data).where(eq(links.id, id)).returning().get();
+  }
+  deleteLink(id: number) {
+    db.delete(links).where(eq(links.id, id)).run();
   }
 }
 

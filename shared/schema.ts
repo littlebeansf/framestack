@@ -49,8 +49,16 @@ export type AnimeStatus = (typeof ANIME_STATUSES)[number];
 export type BookStatus = (typeof BOOK_STATUSES)[number];
 export type AnyStatus = AnimeStatus | BookStatus;
 
+// Broad group for UI grouping (library toggle, add-from-library selector)
 export function getMediaGroup(mediaType: string): "anime" | "book" {
   return mediaType === "manga" || mediaType === "book" ? "book" : "anime";
+}
+
+// Exact media group — used for per-type default collections
+export type ExactMediaGroup = "anime" | "movie" | "series" | "manga" | "book";
+export function getExactMediaGroup(mediaType: string): ExactMediaGroup {
+  const t = mediaType as ExactMediaGroup;
+  return (["anime", "movie", "series", "manga", "book"] as ExactMediaGroup[]).includes(t) ? t : "anime";
 }
 
 export function getStatusesForMediaType(mediaType: string): readonly string[] {
@@ -142,6 +150,36 @@ export type CollectionItem = typeof collectionItems.$inferSelect;
 // ─── Extended item with collection-item status ────────────────────────────────
 export type ItemWithStatus = Item & { collectionItemId?: number; collectionStatus?: string | null };
 
+// ─── Link Lists + Links (Together shared link board) ──────────────────────────
+
+// A named list (e.g. "Date night ideas", "Recipes", "Travel")
+export const linkLists = sqliteTable("link_lists", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  name: text("name").notNull(),
+  emoji: text("emoji"),          // decorative emoji e.g. "🍕"
+  createdAt: integer("created_at").notNull().default(0),
+});
+
+export const insertLinkListSchema = createInsertSchema(linkLists).omit({ id: true });
+export type InsertLinkList = z.infer<typeof insertLinkListSchema>;
+export type LinkList = typeof linkLists.$inferSelect;
+
+// A single link belonging to a list
+export const links = sqliteTable("links", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  listId: integer("list_id").notNull().references(() => linkLists.id),
+  url: text("url").notNull(),
+  title: text("title").notNull(),
+  description: text("description"),
+  favicon: text("favicon"),   // favicon URL (cached from origin)
+  addedBy: text("added_by"),  // "jack" | "sally" | null
+  createdAt: integer("created_at").notNull().default(0),
+});
+
+export const insertLinkSchema = createInsertSchema(links).omit({ id: true });
+export type InsertLink = z.infer<typeof insertLinkSchema>;
+export type Link = typeof links.$inferSelect;
+
 // ─── Users (legacy, kept for DB compatibility) ────────────────────────────────
 
 export const users = sqliteTable("users", {
@@ -158,21 +196,38 @@ export type InsertUser = z.infer<typeof insertUserSchema>;
 export type User = typeof users.$inferSelect;
 
 // ─── Default collection definitions ──────────────────────────────────────────
+// Each exact media type gets its own 4 default collections.
+// mediaGroup stores the exact type ("anime" | "movie" | "series" | "manga" | "book")
 
 export const DEFAULT_COLLECTIONS: Array<{
   name: string;
   description: string;
-  mediaGroup: "anime" | "book";
+  mediaGroup: ExactMediaGroup;
   defaultStatus: string;
 }> = [
-  // Anime/Movie/Series group
-  { name: "Watching", description: "Currently watching", mediaGroup: "anime", defaultStatus: "watching" },
-  { name: "Completed", description: "Finished and done", mediaGroup: "anime", defaultStatus: "completed" },
-  { name: "Want to Rewatch", description: "So good, need to see again", mediaGroup: "anime", defaultStatus: "want_to_rewatch" },
-  { name: "Dropped", description: "Gave up on these", mediaGroup: "anime", defaultStatus: "dropped" },
-  // Book/Manga group
-  { name: "Reading", description: "Currently reading", mediaGroup: "book", defaultStatus: "reading" },
-  { name: "Completed", description: "Books & manga finished", mediaGroup: "book", defaultStatus: "completed" },
-  { name: "Wishlist", description: "Want to read someday", mediaGroup: "book", defaultStatus: "wishlist" },
-  { name: "Owned", description: "Own but haven't started", mediaGroup: "book", defaultStatus: "owned" },
+  // ── Anime
+  { name: "Watching",        description: "Anime I'm currently watching",          mediaGroup: "anime",  defaultStatus: "watching" },
+  { name: "Completed",       description: "Anime I finished",                       mediaGroup: "anime",  defaultStatus: "completed" },
+  { name: "Want to Rewatch", description: "Anime worth a second watch",             mediaGroup: "anime",  defaultStatus: "want_to_rewatch" },
+  { name: "Dropped",         description: "Anime I gave up on",                    mediaGroup: "anime",  defaultStatus: "dropped" },
+  // ── Movie
+  { name: "Watching",        description: "Movies in progress",                    mediaGroup: "movie",  defaultStatus: "watching" },
+  { name: "Completed",       description: "Movies I've seen",                      mediaGroup: "movie",  defaultStatus: "completed" },
+  { name: "Want to Rewatch", description: "Movies worth watching again",            mediaGroup: "movie",  defaultStatus: "want_to_rewatch" },
+  { name: "Dropped",         description: "Movies I didn't finish",                mediaGroup: "movie",  defaultStatus: "dropped" },
+  // ── Series
+  { name: "Watching",        description: "Series I'm currently watching",         mediaGroup: "series", defaultStatus: "watching" },
+  { name: "Completed",       description: "Series I finished",                     mediaGroup: "series", defaultStatus: "completed" },
+  { name: "Want to Rewatch", description: "Series worth another go",               mediaGroup: "series", defaultStatus: "want_to_rewatch" },
+  { name: "Dropped",         description: "Series I abandoned",                   mediaGroup: "series", defaultStatus: "dropped" },
+  // ── Manga
+  { name: "Reading",         description: "Manga I'm currently reading",           mediaGroup: "manga",  defaultStatus: "reading" },
+  { name: "Completed",       description: "Manga I finished",                      mediaGroup: "manga",  defaultStatus: "completed" },
+  { name: "Wishlist",        description: "Manga I want to read",                  mediaGroup: "manga",  defaultStatus: "wishlist" },
+  { name: "Owned",           description: "Manga I own but haven't started",       mediaGroup: "manga",  defaultStatus: "owned" },
+  // ── Book
+  { name: "Reading",         description: "Books I'm currently reading",           mediaGroup: "book",   defaultStatus: "reading" },
+  { name: "Completed",       description: "Books I finished",                      mediaGroup: "book",   defaultStatus: "completed" },
+  { name: "Wishlist",        description: "Books I want to read",                  mediaGroup: "book",   defaultStatus: "wishlist" },
+  { name: "Owned",           description: "Books I own but haven't started",       mediaGroup: "book",   defaultStatus: "owned" },
 ];
