@@ -145,6 +145,7 @@ function LinksPanel({ list }: { list: LinkListType }) {
   const [url, setUrl] = useState("");
   const [title, setTitle] = useState("");
   const [addedBy, setAddedBy] = useState<"jack" | "sally" | "">("");
+  const [linkSort, setLinkSort] = useState<SortDir>("recent");
 
   const linksKey = ["/api/link-lists", list.id, "links"];
 
