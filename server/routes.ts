@@ -386,6 +386,12 @@ export async function registerRoutes(httpServer: Server, app: Express) {
         links.push(...lks);
       }
 
+      // Collect all secret messages
+      const secretMessages = [
+        ...storage.getMessagesFor("jack"),
+        ...storage.getMessagesFor("sally"),
+      ];
+
       const payload = {
         exportedAt: new Date().toISOString(),
         version: 1,
@@ -395,6 +401,7 @@ export async function registerRoutes(httpServer: Server, app: Express) {
         profiles,
         linkLists,
         links,
+        secretMessages,
       };
 
       res.setHeader("Content-Type", "application/json");
@@ -482,5 +489,46 @@ export async function registerRoutes(httpServer: Server, app: Express) {
   app.get("/api/search/books", async (req, res) => {
     req.url = req.url.replace("/books", "/book");
     app._router.handle(req, res, () => {});
+  });
+
+  // ─── Secret Messages ────────────────────────────────────────────────────────────
+
+  // GET /api/messages/:owner — all messages addressed to owner (for archive tab)
+  app.get("/api/messages/:owner", (req, res) => {
+    const owner = req.params.owner;
+    if (owner !== "jack" && owner !== "sally") return res.status(400).json({ error: "Invalid owner" });
+    res.json(storage.getMessagesFor(owner));
+  });
+
+  // GET /api/messages/:owner/unread — unread messages (inbox pop)
+  app.get("/api/messages/:owner/unread", (req, res) => {
+    const owner = req.params.owner;
+    if (owner !== "jack" && owner !== "sally") return res.status(400).json({ error: "Invalid owner" });
+    res.json(storage.getUnreadFor(owner));
+  });
+
+  // POST /api/messages — send a message from one owner to the other
+  app.post("/api/messages", (req, res) => {
+    const { from, to, subject, body, mood } = req.body;
+    if (!from || !to || !body) return res.status(400).json({ error: "from, to, body required" });
+    if (from === to) return res.status(400).json({ error: "Cannot send to yourself" });
+    if (![ "jack", "sally" ].includes(from) || ![ "jack", "sally" ].includes(to))
+      return res.status(400).json({ error: "Invalid sender/recipient" });
+    const msg = storage.createMessage({ from, to, subject: subject || null, body, mood: mood || null });
+    res.status(201).json(msg);
+  });
+
+  // PATCH /api/messages/:id/read — mark as read (archive it)
+  app.patch("/api/messages/:id/read", (req, res) => {
+    const id = parseInt(req.params.id);
+    const updated = storage.markRead(id);
+    if (!updated) return res.status(404).json({ error: "Message not found" });
+    res.json(updated);
+  });
+
+  // DELETE /api/messages/:id — delete a message permanently
+  app.delete("/api/messages/:id", (req, res) => {
+    storage.deleteMessage(parseInt(req.params.id));
+    res.json({ ok: true });
   });
 }

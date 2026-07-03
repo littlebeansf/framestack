@@ -1,6 +1,6 @@
 import { eq, and, desc } from "drizzle-orm";
 import {
-  users, items, collections, collectionItems, profiles, links, linkLists,
+  users, items, collections, collectionItems, profiles, links, linkLists, secretMessages,
   type User, type InsertUser,
   type Item, type InsertItem,
   type Collection, type InsertCollection,
@@ -8,6 +8,7 @@ import {
   type Profile, type InsertProfile,
   type Link, type InsertLink,
   type LinkList, type InsertLinkList,
+  type SecretMessage, type InsertSecretMessage,
   type ItemWithStatus,
   OWNERS, DEFAULT_COLLECTIONS,
 } from "@shared/schema";
@@ -99,6 +100,17 @@ sqlite.exec(`
     description TEXT,
     favicon TEXT,
     added_by TEXT,
+    created_at INTEGER NOT NULL DEFAULT 0
+  );
+
+  CREATE TABLE IF NOT EXISTS secret_messages (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    "from" TEXT NOT NULL,
+    "to" TEXT NOT NULL,
+    subject TEXT,
+    body TEXT NOT NULL,
+    mood TEXT,
+    read_at INTEGER,
     created_at INTEGER NOT NULL DEFAULT 0
   );
 `);
@@ -209,6 +221,7 @@ seedDefaultCollections();
 
 // ─── Interface ───────────────────────────────────────────────────────────────
 
+
 export interface IStorage {
   // Profiles
   getProfile(owner: string): Profile | undefined;
@@ -255,6 +268,13 @@ export interface IStorage {
   createLink(data: InsertLink): Link;
   updateLink(id: number, data: Partial<InsertLink>): Link | undefined;
   deleteLink(id: number): void;
+
+  // Secret Messages
+  getMessagesFor(to: string): SecretMessage[];          // all messages for recipient
+  getUnreadFor(to: string): SecretMessage[];             // unread (inbox) messages
+  createMessage(data: InsertSecretMessage): SecretMessage;
+  markRead(id: number): SecretMessage | undefined;       // sets readAt = now
+  deleteMessage(id: number): void;
 }
 
 export class Storage implements IStorage {
@@ -408,6 +428,35 @@ export class Storage implements IStorage {
   }
   deleteLink(id: number) {
     db.delete(links).where(eq(links.id, id)).run();
+  }
+
+  // ── Secret Messages ───────────────────────────────────────────────────────
+  getMessagesFor(to: string) {
+    return db.select().from(secretMessages)
+      .where(eq(secretMessages.to, to))
+      .orderBy(desc(secretMessages.createdAt))
+      .all();
+  }
+  getUnreadFor(to: string) {
+    return db.select().from(secretMessages)
+      .where(and(eq(secretMessages.to, to)))
+      .orderBy(desc(secretMessages.createdAt))
+      .all()
+      .filter(m => m.readAt === null || m.readAt === undefined);
+  }
+  createMessage(data: InsertSecretMessage) {
+    return db.insert(secretMessages)
+      .values({ ...data, createdAt: Date.now() })
+      .returning().get();
+  }
+  markRead(id: number) {
+    return db.update(secretMessages)
+      .set({ readAt: Date.now() })
+      .where(eq(secretMessages.id, id))
+      .returning().get();
+  }
+  deleteMessage(id: number) {
+    db.delete(secretMessages).where(eq(secretMessages.id, id)).run();
   }
 }
 

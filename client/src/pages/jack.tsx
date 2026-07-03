@@ -2,20 +2,22 @@ import { useState, useCallback } from "react";
 import { useLocation } from "wouter";
 import OwnerProfilePage from "./owner-profile";
 import OwnerCollectionsPage from "./owner-collections";
+import SecretMessagesTab from "@/components/SecretMessages";
 import OwnerIntro from "@/components/OwnerIntro";
 import { navHistory } from "@/lib/navHistory";
 import { cn } from "@/lib/utils";
 
 const TABS = [
-  { id: "profile", label: "Profile", path: "/jack" },
+  { id: "profile",   label: "Profile",   path: "/jack" },
   { id: "collections", label: "Collections", path: "/jack/collections" },
+  { id: "messages",  label: "💌 Letters", path: "/jack/messages" },
 ];
 const accent = "hsl(220 80% 60%)";
+const sallyAccent = "hsl(330 75% 65%)";
 
 export default function JackPage({ sub }: { sub?: string }) {
   const [, setLocation] = useLocation();
-  const tab = sub === "collections" ? "collections" : "profile";
-  // Show intro only when arriving from a different owner section (or fresh load)
+  const tab = sub === "collections" ? "collections" : sub === "messages" ? "messages" : "profile";
   const [showIntro, setShowIntro] = useState(() => !navHistory.prev.startsWith("/jack"));
   const onDone = useCallback(() => setShowIntro(false), []);
 
@@ -39,7 +41,15 @@ export default function JackPage({ sub }: { sub?: string }) {
         ))}
       </div>
 
-      {tab === "profile" ? <OwnerProfilePage owner="jack" /> : <OwnerCollectionsPage owner="jack" />}
+      {tab === "profile" && <OwnerProfilePage owner="jack" />}
+      {tab === "collections" && <OwnerCollectionsPage owner="jack" />}
+      {tab === "messages" && (
+        <SecretMessagesTab
+          owner="jack"
+          accentOwner={accent}
+          accentOther={sallyAccent}
+        />
+      )}
     </div>
   );
 }

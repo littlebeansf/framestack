@@ -180,6 +180,26 @@ export const insertLinkSchema = createInsertSchema(links).omit({ id: true });
 export type InsertLink = z.infer<typeof insertLinkSchema>;
 export type Link = typeof links.$inferSelect;
 
+// ─── Secret Messages (jack ↔ sally) ──────────────────────────────────────────
+// from: "jack" | "sally"   — who wrote it
+// to:   "jack" | "sally"   — who receives it
+// readAt: null = unread (shows as inbox pop), non-null = archived
+
+export const secretMessages = sqliteTable("secret_messages", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  from: text("from").notNull(),          // "jack" | "sally"
+  to: text("to").notNull(),              // "jack" | "sally"
+  subject: text("subject"),             // optional short subject line
+  body: text("body").notNull(),          // message content
+  mood: text("mood"),                   // emoji mood tag e.g. "💖" "😂" "🔥"
+  readAt: integer("read_at"),           // unix ms timestamp — null = unread
+  createdAt: integer("created_at").notNull().default(0),
+});
+
+export const insertSecretMessageSchema = createInsertSchema(secretMessages).omit({ id: true, readAt: true });
+export type InsertSecretMessage = z.infer<typeof insertSecretMessageSchema>;
+export type SecretMessage = typeof secretMessages.$inferSelect;
+
 // ─── Users (legacy, kept for DB compatibility) ────────────────────────────────
 
 export const users = sqliteTable("users", {
