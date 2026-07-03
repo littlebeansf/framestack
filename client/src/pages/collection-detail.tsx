@@ -152,6 +152,11 @@ export default function CollectionDetailPage() {
 
   const { data: allCollections } = useQuery<Collection[]>({
     queryKey: ["/api/collections"],
+    queryFn: async () => {
+      const res = await apiRequest("GET", "/api/collections");
+      return res.json();
+    },
+    staleTime: 30_000,
   });
   const collection = (allCollections || []).find(c => c.id === id);
 
@@ -169,6 +174,7 @@ export default function CollectionDetailPage() {
       }
     },
     enabled: !!id,
+    staleTime: 30_000,
   });
 
   const removeMutation = useMutation({

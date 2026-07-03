@@ -478,6 +478,7 @@ export default function QuotesTab({
 
   const { data: allQuotes = [], isLoading } = useQuery<Quote[]>({
     queryKey: ["/api/quotes", owner],
+    staleTime: 30_000,
     queryFn: async () => {
       const res = await apiRequest("GET", `/api/quotes/${owner}`, undefined);
       return res.json();

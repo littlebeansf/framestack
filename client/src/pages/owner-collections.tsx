@@ -661,6 +661,7 @@ export default function OwnerCollectionsPage({ owner }: { owner: string }) {
       const res = await apiRequest("GET", `/api/collections?owner=${owner}`, undefined);
       return res.json();
     },
+    staleTime: 30_000,
   });
 
   const cols = collections || [];

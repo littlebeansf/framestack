@@ -151,6 +151,7 @@ function LinksPanel({ list }: { list: LinkListType }) {
 
   const { data: links = [], isLoading } = useQuery<Link[]>({
     queryKey: linksKey,
+    staleTime: 30_000,
     queryFn: async () => {
       const res = await apiRequest("GET", `/api/link-lists/${list.id}/links`, undefined);
       return res.json();
@@ -308,6 +309,7 @@ export default function LinkList() {
 
   const { data: listsRaw = [], isLoading: listsLoading } = useQuery<LinkListType[]>({
     queryKey: listsKey,
+    staleTime: 60_000,
     queryFn: async () => {
       const res = await apiRequest("GET", "/api/link-lists", undefined);
       return res.json();

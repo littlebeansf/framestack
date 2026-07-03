@@ -57,6 +57,11 @@ export default function ItemEditDialog({
   // Only non-default collections for manual adding
   const { data: allCollections } = useQuery<Collection[]>({
     queryKey: ["/api/collections"],
+    queryFn: async () => {
+      const res = await apiRequest("GET", "/api/collections");
+      return res.json();
+    },
+    staleTime: 60_000,
   });
   const customCollections = (allCollections || []).filter(c => !c.isDefault);
 

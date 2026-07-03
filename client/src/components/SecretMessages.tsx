@@ -429,6 +429,7 @@ export default function SecretMessagesTab({
   // All messages addressed to this owner (archive)
   const { data: allMessages = [], isLoading } = useQuery<SecretMessage[]>({
     queryKey: ["/api/messages", owner],
+    staleTime: 15_000,
     queryFn: async () => {
       const res = await apiRequest("GET", `/api/messages/${owner}`, undefined);
       return res.json();
@@ -438,6 +439,7 @@ export default function SecretMessagesTab({
   // Unread messages (inbox pop)
   const { data: unread = [] } = useQuery<SecretMessage[]>({
     queryKey: ["/api/messages", owner, "unread"],
+    staleTime: 15_000,
     queryFn: async () => {
       const res = await apiRequest("GET", `/api/messages/${owner}/unread`, undefined);
       return res.json();
