@@ -105,15 +105,14 @@ app.post("/__auth", express.urlencoded({ extended: false }), (req: Request, res:
   }
 });
 
-// ── HTML gate — show login page for unauthenticated requests to index.html ────
+// ── HTML gate — always show login page for all non-excluded routes ─────────────
 // API routes are protected separately below (x-auth-token header check).
 // Static assets (/assets/*, favicons) are served freely by static.ts so the
 // login page can load its own CSS/JS.
-function isHtmlRequest(req: Request): boolean {
-  const accept = req.headers.accept || "";
-  return accept.includes("text/html");
-}
-
+// NOTE: We intentionally do NOT check isHtmlRequest / Accept headers here.
+// The CDN/proxy layer (pplx.app) may strip or modify Accept headers, causing
+// isHtmlRequest to return false and bypass the login gate. Instead we
+// unconditionally serve the login page for all non-excluded paths.
 app.use((req: Request, res: Response, next: NextFunction) => {
   // Always allow: the auth endpoint itself, static assets, API routes
   if (req.path === "/__auth") return next();
@@ -121,17 +120,9 @@ app.use((req: Request, res: Response, next: NextFunction) => {
   if (req.path.startsWith("/api/")) return next();
   if (["/favicon.svg", "/favicon-32.png", "/favicon-512.png", "/apple-touch-icon.png"].includes(req.path)) return next();
 
-  // For HTML navigation — check if the browser already knows the token via referrer
-  // We can't check session here; instead just serve the login page for non-API requests
-  // if they don't carry a valid x-auth-token. HTML requests come from browser nav, not
-  // from the React app — so we always show login page (React reads token from hash).
-  if (isHtmlRequest(req)) {
-    // Serve login page — React will re-attach token from URL hash after login
-    res.send(LOGIN_HTML.replace("{{ERR_CLASS}}", ""));
-    return;
-  }
-
-  next();
+  // Unconditionally show login for everything else — no Accept-header check.
+  // React reads the token from the URL hash after login and stores it.
+  res.send(LOGIN_HTML.replace("{{ERR_CLASS}}", ""));
 });
 
 // ── API auth middleware — check x-auth-token header ────────────────────────────

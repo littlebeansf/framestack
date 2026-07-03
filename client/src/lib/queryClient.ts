@@ -14,10 +14,24 @@ export { API_BASE };
 let _authToken: string = "";
 
 function initToken() {
+  // 1. Check sessionStorage first — survives page refresh on published site
+  //    (The "no localStorage" rule was for the preview iframe only; the published
+  //     pplx.app sandbox runs outside the iframe so sessionStorage is available.)
+  try {
+    const stored = sessionStorage.getItem("fs_token");
+    if (stored) {
+      _authToken = stored;
+      return;
+    }
+  } catch { /* sessionStorage may be unavailable in some envs — ignore */ }
+
+  // 2. Check URL hash — set by the server after a successful login redirect
   const hash = window.location.hash; // e.g. "#__token=abc123" or "#/jack#__token=abc123"
   const match = hash.match(/__token=([a-f0-9]+)/);
   if (match) {
     _authToken = match[1];
+    // Persist so the token survives page refreshes
+    try { sessionStorage.setItem("fs_token", _authToken); } catch { /* ignore */ }
     // Strip the token from the URL hash cleanly
     const cleanHash = hash.replace(/[#&]?__token=[a-f0-9]+/, "").replace(/^#$/, "") || "#/";
     window.history.replaceState(null, "", cleanHash || "/");

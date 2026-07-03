@@ -254,22 +254,25 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
           href={`${API_BASE}/api/export`}
           data-testid="button-export"
           onClick={e => {
-            // Attach auth token as a query param since <a> can't set headers
             e.preventDefault();
             const token = getAuthToken();
-            const url = `${API_BASE}/api/export${token ? `?token=${token}` : ''}`;
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `framestack-backup-${new Date().toISOString().slice(0,10)}.json`;
-            // Use fetch to attach header, then blob-download
-            fetch(url.replace('?token='+token, ''), { headers: token ? { 'x-auth-token': token } : {} })
-              .then(r => r.blob())
+            const apiUrl = `${API_BASE}/api/export`;
+            const filename = `framestack-backup-${new Date().toISOString().slice(0,10)}.json`;
+            // Use fetch with x-auth-token header, then trigger a blob download
+            fetch(apiUrl, { headers: token ? { 'x-auth-token': token } : {} })
+              .then(r => {
+                if (!r.ok) throw new Error(`Export failed: ${r.status}`);
+                return r.blob();
+              })
               .then(blob => {
                 const u = URL.createObjectURL(blob);
+                const a = document.createElement('a');
                 a.href = u;
+                a.download = filename;
                 a.click();
                 URL.revokeObjectURL(u);
-              });
+              })
+              .catch(err => console.error('[export]', err));
           }}
           className="w-full flex items-center gap-3 px-3 py-2 rounded-xl text-sm text-muted-foreground hover:bg-sidebar-accent hover:text-foreground transition-all group cursor-pointer"
         >
