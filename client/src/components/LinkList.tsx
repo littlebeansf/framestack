@@ -2,19 +2,20 @@
  * LinkList — Together's shared link board.
  *
  * Two-panel layout:
- *   Left  — named lists (create / delete). Each list has a name + optional emoji.
- *   Right — links inside the selected list (add URL+title, open, delete).
+ *   Left  — named lists (create / rename / delete).
+ *   Right — links inside the selected list (add URL+title+icon, open, delete).
  *
  * API:
  *   GET    /api/link-lists                       → LinkList[]
  *   POST   /api/link-lists                       ← { name, emoji }
+ *   PATCH  /api/link-lists/:listId               ← { name, emoji }
  *   DELETE /api/link-lists/:listId               (cascades links)
  *   GET    /api/link-lists/:listId/links         → Link[]
- *   POST   /api/link-lists/:listId/links         ← { url, title, addedBy? }
+ *   POST   /api/link-lists/:listId/links         ← { url, title, addedBy?, icon?, favicon? }
  *   DELETE /api/links/:id
  */
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useRef, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -31,6 +32,9 @@ import {
   ArrowDownAZ,
   ArrowUpAZ,
   Clock,
+  Pencil,
+  Check,
+  X,
 } from "lucide-react";
 
 const ACCENT = "hsl(20 90% 60%)";
@@ -47,6 +51,23 @@ function ensureHttps(url: string) {
   if (!url) return url;
   if (url.startsWith("http://") || url.startsWith("https://")) return url;
   return `https://${url}`;
+}
+
+// ── Icon badge ────────────────────────────────────────────────────────────────
+
+function IconBadge({ icon }: { icon: string }) {
+  // If the icon is a single emoji (≤2 code points), render larger; else render as a pill
+  const isEmoji = [...icon].length <= 2;
+  return isEmoji ? (
+    <span className="flex-shrink-0 text-base leading-none" title={icon}>{icon}</span>
+  ) : (
+    <span
+      className="flex-shrink-0 text-[10px] font-bold px-1.5 py-0.5 rounded-full capitalize"
+      style={{ background: `${ACCENT}25`, color: ACCENT }}
+    >
+      {icon}
+    </span>
+  );
 }
 
 // ── Link row ──────────────────────────────────────────────────────────────────
@@ -77,7 +98,10 @@ function LinkRow({ link, onDelete }: { link: Link; onDelete: (id: number) => voi
 
       {/* Title + host */}
       <div className="flex-1 min-w-0">
-        <p className="text-sm font-semibold text-foreground truncate leading-tight">{link.title}</p>
+        <div className="flex items-center gap-1.5 min-w-0">
+          {link.icon && <IconBadge icon={link.icon} />}
+          <p className="text-sm font-semibold text-foreground truncate leading-tight">{link.title}</p>
+        </div>
         <p className="text-[11px] text-muted-foreground truncate">{prettyHost(link.url)}</p>
       </div>
 
@@ -145,6 +169,7 @@ function LinksPanel({ list }: { list: LinkListType }) {
   const [url, setUrl] = useState("");
   const [title, setTitle] = useState("");
   const [addedBy, setAddedBy] = useState<"jack" | "sally" | "">("");
+  const [icon, setIcon] = useState("");
   const [linkSort, setLinkSort] = useState<SortDir>("recent");
 
   const linksKey = ["/api/link-lists", list.id, "links"];
@@ -166,6 +191,7 @@ function LinksPanel({ list }: { list: LinkListType }) {
       setUrl("");
       setTitle("");
       setAddedBy("");
+      setIcon("");
       toast({ title: "Link added" });
     },
     onError: () => toast({ title: "Failed to add link", variant: "destructive" }),
@@ -187,6 +213,7 @@ function LinksPanel({ list }: { list: LinkListType }) {
       url: ensureHttps(trimUrl),
       title: trimTitle,
       addedBy: addedBy || null,
+      icon: icon.trim() || null,
       favicon: trimUrl ? `https://www.google.com/s2/favicons?sz=64&domain=${ensureHttps(trimUrl)}` : null,
     });
   }
@@ -226,6 +253,18 @@ function LinksPanel({ list }: { list: LinkListType }) {
             className="h-8 text-sm flex-1"
             onKeyDown={e => e.key === "Enter" && handleAdd()}
           />
+          {/* Icon / tag */}
+          <Input
+            data-testid="input-link-icon"
+            placeholder="🏷️ tag"
+            value={icon}
+            onChange={e => setIcon(e.target.value)}
+            className="h-8 text-sm w-20 text-center"
+            maxLength={8}
+            title="Optional emoji or short label (e.g. 🎬 or 'inspo')"
+          />
+        </div>
+        <div className="flex gap-2 items-center">
           {/* Who added it */}
           <div className="flex gap-1 flex-shrink-0">
             {(["jack", "sally"] as const).map(who => (
@@ -253,7 +292,7 @@ function LinksPanel({ list }: { list: LinkListType }) {
             data-testid="button-link-add"
             onClick={handleAdd}
             disabled={!url.trim() || !title.trim() || addMutation.isPending}
-            className="h-8 px-3 text-xs"
+            className="h-8 px-3 text-xs ml-auto"
             style={{ background: ACCENT, color: "white" }}
           >
             <Plus size={13} />
@@ -292,12 +331,95 @@ function LinksPanel({ list }: { list: LinkListType }) {
   );
 }
 
+// ── Inline list name editor ───────────────────────────────────────────────────
+
+function ListNameEditor({
+  list,
+  listsKey,
+  onDone,
+}: {
+  list: LinkListType;
+  listsKey: string[];
+  onDone: () => void;
+}) {
+  const qc = useQueryClient();
+  const { toast } = useToast();
+  const [emoji, setEmoji] = useState(list.emoji ?? "");
+  const [name, setName] = useState(list.name);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => { inputRef.current?.focus(); }, []);
+
+  const patchMutation = useMutation({
+    mutationFn: (body: object) => apiRequest("PATCH", `/api/link-lists/${list.id}`, body),
+    onSuccess: async (res) => {
+      const updated: LinkListType = await res.json();
+      qc.setQueryData(listsKey, (old: LinkListType[] = []) =>
+        old.map(l => l.id === updated.id ? updated : l)
+      );
+      toast({ title: "List updated" });
+      onDone();
+    },
+    onError: () => toast({ title: "Failed to update list", variant: "destructive" }),
+  });
+
+  function handleSave() {
+    const trimName = name.trim();
+    if (!trimName) return;
+    patchMutation.mutate({ name: trimName, emoji: emoji.trim() || null });
+  }
+
+  function handleKeyDown(e: React.KeyboardEvent) {
+    if (e.key === "Enter") handleSave();
+    if (e.key === "Escape") onDone();
+  }
+
+  return (
+    <div className="flex items-center gap-1 w-full" onClick={e => e.stopPropagation()}>
+      <Input
+        placeholder="🔗"
+        value={emoji}
+        onChange={e => setEmoji(e.target.value)}
+        className="h-7 w-9 text-center text-sm px-1 flex-shrink-0"
+        maxLength={2}
+        onKeyDown={handleKeyDown}
+      />
+      <Input
+        ref={inputRef}
+        value={name}
+        onChange={e => setName(e.target.value)}
+        className="h-7 text-sm flex-1 min-w-0"
+        onKeyDown={handleKeyDown}
+        data-testid="input-list-rename"
+      />
+      <button
+        onClick={handleSave}
+        disabled={!name.trim() || patchMutation.isPending}
+        className="w-6 h-6 rounded-md flex items-center justify-center text-green-500
+          hover:bg-green-500/15 transition-colors flex-shrink-0"
+        aria-label="Save"
+      >
+        <Check size={12} />
+      </button>
+      <button
+        onClick={onDone}
+        className="w-6 h-6 rounded-md flex items-center justify-center text-muted-foreground
+          hover:bg-secondary transition-colors flex-shrink-0"
+        aria-label="Cancel"
+      >
+        <X size={12} />
+      </button>
+    </div>
+  );
+}
+
 // ── Main export ───────────────────────────────────────────────────────────────
 
 export default function LinkList() {
   const qc = useQueryClient();
   const { toast } = useToast();
   const [selectedId, setSelectedId] = useState<number | null>(null);
+  const [editingId, setEditingId] = useState<number | null>(null);
 
   // Create-list form state
   const [newName, setNewName] = useState("");
@@ -409,35 +531,57 @@ export default function LinkList() {
 
           {!listsLoading && lists.map(list => {
             const active = list.id === (selectedList?.id ?? null);
+            const isEditing = editingId === list.id;
+
             return (
               <div
                 key={list.id}
                 data-testid={`button-list-${list.id}`}
-                className="group flex items-center gap-2 px-3 py-2 rounded-xl cursor-pointer transition-all duration-150"
+                className="group flex items-center gap-2 px-2 py-2 rounded-xl cursor-pointer transition-all duration-150"
                 style={
                   active
                     ? { background: `${ACCENT}22`, border: `1px solid ${ACCENT}55` }
                     : { border: "1px solid transparent" }
                 }
-                onClick={() => setSelectedId(list.id)}
+                onClick={() => { if (!isEditing) setSelectedId(list.id); }}
               >
-                <span className="text-base leading-none flex-shrink-0">{list.emoji ?? "🔗"}</span>
-                <span
-                  className="flex-1 text-sm font-semibold truncate"
-                  style={active ? { color: ACCENT } : {}}
-                >
-                  {list.name}
-                </span>
-                {active && <ChevronRight size={12} style={{ color: ACCENT, opacity: 0.7 }} />}
-                <button
-                  data-testid={`button-delete-list-${list.id}`}
-                  onClick={e => { e.stopPropagation(); deleteMutation.mutate(list.id); }}
-                  className="w-6 h-6 rounded-md flex items-center justify-center text-muted-foreground
-                    hover:bg-destructive/15 hover:text-destructive transition-colors opacity-0 group-hover:opacity-100 flex-shrink-0"
-                  aria-label="Delete list"
-                >
-                  <Trash2 size={11} />
-                </button>
+                {isEditing ? (
+                  <ListNameEditor
+                    list={list}
+                    listsKey={listsKey as string[]}
+                    onDone={() => setEditingId(null)}
+                  />
+                ) : (
+                  <>
+                    <span className="text-base leading-none flex-shrink-0">{list.emoji ?? "🔗"}</span>
+                    <span
+                      className="flex-1 text-sm font-semibold truncate"
+                      style={active ? { color: ACCENT } : {}}
+                    >
+                      {list.name}
+                    </span>
+                    {active && !isEditing && <ChevronRight size={12} style={{ color: ACCENT, opacity: 0.7 }} />}
+                    {/* Edit button — always visible on hover */}
+                    <button
+                      data-testid={`button-edit-list-${list.id}`}
+                      onClick={e => { e.stopPropagation(); setSelectedId(list.id); setEditingId(list.id); }}
+                      className="w-6 h-6 rounded-md flex items-center justify-center text-muted-foreground
+                        hover:bg-secondary hover:text-foreground transition-colors opacity-0 group-hover:opacity-100 flex-shrink-0"
+                      aria-label="Rename list"
+                    >
+                      <Pencil size={10} />
+                    </button>
+                    <button
+                      data-testid={`button-delete-list-${list.id}`}
+                      onClick={e => { e.stopPropagation(); deleteMutation.mutate(list.id); }}
+                      className="w-6 h-6 rounded-md flex items-center justify-center text-muted-foreground
+                        hover:bg-destructive/15 hover:text-destructive transition-colors opacity-0 group-hover:opacity-100 flex-shrink-0"
+                      aria-label="Delete list"
+                    >
+                      <Trash2 size={11} />
+                    </button>
+                  </>
+                )}
               </div>
             );
           })}

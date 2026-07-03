@@ -173,6 +173,7 @@ export const links = sqliteTable("links", {
   description: text("description"),
   favicon: text("favicon"),   // favicon URL (cached from origin)
   addedBy: text("added_by"),  // "jack" | "sally" | null
+  icon: text("icon"),         // optional emoji or short tag e.g. "🎬" "inspo" "must"
   createdAt: integer("created_at").notNull().default(0),
 });
 

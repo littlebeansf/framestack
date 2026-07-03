@@ -328,11 +328,14 @@ export async function registerRoutes(httpServer: Server, app: Express) {
     try {
       const listId = parseInt(req.params.listId);
       if (!storage.getLinkListById(listId)) return res.status(404).json({ error: "List not found" });
-      const { url, title, description, addedBy } = req.body;
+      const { url, title, description, addedBy, icon, favicon: clientFavicon } = req.body;
       if (!url?.trim() || !title?.trim()) return res.status(400).json({ error: "url and title required" });
-      let favicon: string | null = null;
-      try { favicon = `${new URL(url).origin}/favicon.ico`; } catch {}
-      res.json(storage.createLink({ listId, url: url.trim(), title: title.trim(), description: description?.trim() ?? null, favicon, addedBy: addedBy ?? null, createdAt: Date.now() }));
+      // Use client-provided favicon (Google S2 service) if available, else derive from origin
+      let favicon: string | null = clientFavicon ?? null;
+      if (!favicon) {
+        try { favicon = `${new URL(url).origin}/favicon.ico`; } catch {}
+      }
+      res.json(storage.createLink({ listId, url: url.trim(), title: title.trim(), description: description?.trim() ?? null, favicon, addedBy: addedBy ?? null, icon: icon?.trim() ?? null, createdAt: Date.now() }));
     } catch (err: any) {
       res.status(500).json({ error: err.message });
     }
