@@ -359,6 +359,125 @@ export async function registerRoutes(httpServer: Server, app: Express) {
     }
   });
 
+  // ─── Export / Restore (full DB backup) ──────────────────────────────────────
+  // GET  /api/export  → download entire DB as JSON (items, collections, collection-items, profiles, link-lists, links)
+  // POST /api/restore → restore from that same JSON shape (additive — does not wipe existing data first)
+
+  app.get("/api/export", (_req, res) => {
+    try {
+      const items       = storage.getAllItems();
+      const collections = storage.getAllCollections();
+      const profiles    = ["jack", "sally", "together"].map(o => storage.getProfile(o)).filter(Boolean);
+      const linkLists   = storage.getAllLinkLists();
+
+      // Collect all collection-items
+      const collectionItems: Array<{ collectionId: number; itemId: number; status: string | null }> = [];
+      for (const col of collections) {
+        const its = storage.getItemsInCollection(col.id);
+        for (const it of its) {
+          collectionItems.push({ collectionId: col.id, itemId: it.id, status: (it as any).collectionStatus ?? null });
+        }
+      }
+
+      // Collect all links per list
+      const links: Array<any> = [];
+      for (const ll of linkLists) {
+        const lks = storage.getLinksByList(ll.id);
+        links.push(...lks);
+      }
+
+      const payload = {
+        exportedAt: new Date().toISOString(),
+        version: 1,
+        items,
+        collections,
+        collectionItems,
+        profiles,
+        linkLists,
+        links,
+      };
+
+      res.setHeader("Content-Type", "application/json");
+      res.setHeader("Content-Disposition", `attachment; filename="framestack-backup-${new Date().toISOString().slice(0,10)}.json"`);
+      res.json(payload);
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  app.post("/api/restore", (req, res) => {
+    try {
+      const { items: restoreItems = [], collections: restoreCols = [], collectionItems: restoreCI = [],
+              linkLists: restoreLists = [], links: restoreLinks = [] } = req.body;
+
+      const itemIdMap: Record<number, number> = {};
+      const colIdMap:  Record<number, number> = {};
+      const listIdMap: Record<number, number> = {};
+
+      // Restore items (skip duplicates by externalId+externalSource)
+      const existingItems = storage.getAllItems();
+      const existingKeys = new Set(existingItems.map((i: any) => `${i.externalSource}:${i.externalId}`));
+
+      for (const item of restoreItems) {
+        const key = `${item.externalSource}:${item.externalId}`;
+        if (item.externalId && existingKeys.has(key)) {
+          // Already exists — map old ID to existing item's ID
+          const existing = existingItems.find((i: any) => i.externalSource === item.externalSource && i.externalId === item.externalId);
+          if (existing) itemIdMap[item.id] = existing.id;
+          continue;
+        }
+        const { id: oldId, userId: _u, ...rest } = item;
+        const created = storage.createItem({ ...rest, userId: USER_ID });
+        itemIdMap[oldId] = created.id;
+        if (item.externalId) existingKeys.add(key);
+      }
+
+      // Restore non-default collections
+      const existingCols = storage.getAllCollections();
+      for (const col of restoreCols) {
+        if (col.isDefault) {
+          // Map to the existing default collection with same owner+mediaGroup+defaultStatus
+          const match = existingCols.find((c: any) =>
+            c.owner === col.owner && c.isDefault &&
+            c.mediaGroup === col.mediaGroup && c.defaultStatus === col.defaultStatus
+          );
+          if (match) colIdMap[col.id] = match.id;
+          continue;
+        }
+        const { id: oldId, userId: _u, ...rest } = col;
+        const created = storage.createCollection({ ...rest, userId: USER_ID });
+        colIdMap[oldId] = created.id;
+      }
+
+      // Restore collection-items
+      for (const ci of restoreCI) {
+        const newColId  = colIdMap[ci.collectionId];
+        const newItemId = itemIdMap[ci.itemId];
+        if (!newColId || !newItemId) continue;
+        try { storage.addItemToCollection({ collectionId: newColId, itemId: newItemId, status: ci.status ?? null }); } catch {}
+      }
+
+      // Restore link lists
+      for (const ll of restoreLists) {
+        const { id: oldId, ...rest } = ll;
+        const created = storage.createLinkList({ ...rest });
+        listIdMap[oldId] = created.id;
+      }
+
+      // Restore links
+      for (const lk of restoreLinks) {
+        const newListId = listIdMap[lk.listId];
+        if (!newListId) continue;
+        const { id: _id, listId: _l, ...rest } = lk;
+        try { storage.createLink({ ...rest, listId: newListId }); } catch {}
+      }
+
+      res.json({ ok: true, itemsRestored: Object.keys(itemIdMap).length, collectionsRestored: Object.keys(colIdMap).length });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
   // books alias
   app.get("/api/search/books", async (req, res) => {
     req.url = req.url.replace("/books", "/book");

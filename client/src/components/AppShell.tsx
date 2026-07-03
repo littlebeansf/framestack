@@ -5,7 +5,7 @@ import { getAuthToken } from "@/lib/queryClient";
 import { useQuery } from "@tanstack/react-query";
 import { apiRequest, API_BASE } from "@/lib/queryClient";
 import { cn } from "@/lib/utils";
-import { Library, Search, Menu, Sun, Moon, Sparkles } from "lucide-react";
+import { Library, Search, Menu, Sun, Moon, Sparkles, Download } from "lucide-react";
 import SearchDialog from "@/components/SearchDialog";
 import type { Profile } from "@shared/schema";
 
@@ -248,7 +248,35 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
       </ul>
 
       {/* Bottom */}
-      <div className="px-3 pb-4 border-t border-sidebar-border pt-3">
+      <div className="px-3 pb-4 border-t border-sidebar-border pt-3 space-y-0.5">
+        {/* Backup download — always visible so data is never lost */}
+        <a
+          href={`${API_BASE}/api/export`}
+          data-testid="button-export"
+          onClick={e => {
+            // Attach auth token as a query param since <a> can't set headers
+            e.preventDefault();
+            const token = getAuthToken();
+            const url = `${API_BASE}/api/export${token ? `?token=${token}` : ''}`;
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `framestack-backup-${new Date().toISOString().slice(0,10)}.json`;
+            // Use fetch to attach header, then blob-download
+            fetch(url.replace('?token='+token, ''), { headers: token ? { 'x-auth-token': token } : {} })
+              .then(r => r.blob())
+              .then(blob => {
+                const u = URL.createObjectURL(blob);
+                a.href = u;
+                a.click();
+                URL.revokeObjectURL(u);
+              });
+          }}
+          className="w-full flex items-center gap-3 px-3 py-2 rounded-xl text-sm text-muted-foreground hover:bg-sidebar-accent hover:text-foreground transition-all group cursor-pointer"
+        >
+          <Download size={14} className="transition-transform duration-200 group-hover:translate-y-0.5" />
+          Export backup
+        </a>
+
         <button
           onClick={toggleTheme}
           data-testid="button-theme-toggle"
