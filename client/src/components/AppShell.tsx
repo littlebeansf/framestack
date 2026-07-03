@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { Link, useLocation } from "wouter";
 import { navHistory } from "@/lib/navHistory";
+import { getAuthToken } from "@/lib/queryClient";
 import { useQuery } from "@tanstack/react-query";
 import { apiRequest, API_BASE } from "@/lib/queryClient";
 import { cn } from "@/lib/utils";
@@ -184,9 +185,10 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   }, [location]);
 
   // Fetch live profile emoji for each owner so nav icon matches profile
-  const { data: jackProfile }     = useQuery<Profile>({ queryKey: ["/api/profiles", "jack"],     queryFn: async () => { const r = await fetch(`${API_BASE}/api/profiles/jack`);     return r.json(); }, staleTime: 60_000 });
-  const { data: sallyProfile }    = useQuery<Profile>({ queryKey: ["/api/profiles", "sally"],    queryFn: async () => { const r = await fetch(`${API_BASE}/api/profiles/sally`);    return r.json(); }, staleTime: 60_000 });
-  const { data: togetherProfile } = useQuery<Profile>({ queryKey: ["/api/profiles", "together"], queryFn: async () => { const r = await fetch(`${API_BASE}/api/profiles/together`); return r.json(); }, staleTime: 60_000 });
+  const authH = () => getAuthToken() ? { "x-auth-token": getAuthToken() } : {};
+  const { data: jackProfile }     = useQuery<Profile>({ queryKey: ["/api/profiles", "jack"],     queryFn: async () => { const r = await fetch(`${API_BASE}/api/profiles/jack`,     { headers: authH() }); return r.json(); }, staleTime: 60_000 });
+  const { data: sallyProfile }    = useQuery<Profile>({ queryKey: ["/api/profiles", "sally"],    queryFn: async () => { const r = await fetch(`${API_BASE}/api/profiles/sally`,    { headers: authH() }); return r.json(); }, staleTime: 60_000 });
+  const { data: togetherProfile } = useQuery<Profile>({ queryKey: ["/api/profiles", "together"], queryFn: async () => { const r = await fetch(`${API_BASE}/api/profiles/together`, { headers: authH() }); return r.json(); }, staleTime: 60_000 });
 
   const profileEmojis: Record<string, string> = {
     jack:     jackProfile?.avatarEmoji     ?? DEFAULT_EMOJIS.jack,

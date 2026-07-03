@@ -16,7 +16,7 @@
 
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { apiRequest, API_BASE } from "@/lib/queryClient";
+import { apiRequest, API_BASE, getAuthToken } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import type { LinkList as LinkListType, Link } from "@shared/schema";
 import { Input } from "@/components/ui/input";
@@ -132,7 +132,7 @@ function LinksPanel({ list }: { list: LinkListType }) {
 
   const { data: links = [], isLoading } = useQuery<Link[]>({
     queryKey: linksKey,
-    queryFn: () => fetch(`${API_BASE}/api/link-lists/${list.id}/links`).then(r => r.json()),
+    queryFn: () => fetch(`${API_BASE}/api/link-lists/${list.id}/links`, { headers: getAuthToken() ? { "x-auth-token": getAuthToken() } : {} }).then(r => r.json()),
   });
 
   const addMutation = useMutation({
@@ -275,7 +275,7 @@ export default function LinkList() {
 
   const { data: lists = [], isLoading: listsLoading } = useQuery<LinkListType[]>({
     queryKey: listsKey,
-    queryFn: () => fetch(`${API_BASE}/api/link-lists`).then(r => r.json()),
+    queryFn: () => fetch(`${API_BASE}/api/link-lists`, { headers: getAuthToken() ? { "x-auth-token": getAuthToken() } : {} }).then(r => r.json()),
   });
 
   // Auto-select first list

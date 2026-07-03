@@ -1,6 +1,6 @@
 import { useState, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { apiRequest, API_BASE } from "@/lib/queryClient";
+import { apiRequest, API_BASE, getAuthToken } from "@/lib/queryClient";
 import type { Profile, Item, Collection } from "@shared/schema";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
@@ -205,7 +205,9 @@ export default function OwnerProfilePage({ owner }: { owner: string }) {
   const { data: profile, isLoading: profileLoading } = useQuery<Profile>({
     queryKey: ["/api/profiles", owner],
     queryFn: async () => {
-      const res = await fetch(`${API_BASE}/api/profiles/${owner}`);
+      const res = await fetch(`${API_BASE}/api/profiles/${owner}`, {
+        headers: getAuthToken() ? { "x-auth-token": getAuthToken() } : {},
+      });
       return res.json();
     },
   });
@@ -214,8 +216,9 @@ export default function OwnerProfilePage({ owner }: { owner: string }) {
   const { data: collections } = useQuery<Collection[]>({
     queryKey: ["/api/collections", owner],
     queryFn: async () => {
-      const base = API_BASE;
-      const res = await fetch(`${base}/api/collections?owner=${owner}`);
+      const res = await fetch(`${API_BASE}/api/collections?owner=${owner}`, {
+        headers: getAuthToken() ? { "x-auth-token": getAuthToken() } : {},
+      });
       return res.json();
     },
   });

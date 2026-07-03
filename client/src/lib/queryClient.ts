@@ -7,7 +7,32 @@ const API_BASE = "__PORT_5000__".startsWith("__") ? "" : "__PORT_5000__";
 
 export { API_BASE };
 
-// ─── Error helper ─────────────────────────────────────────────────────────────
+// ── Auth token ─────────────────────────────────────────────────────────────────
+// After login, the server redirects to /#__token=<token>.
+// We read it from the hash once, store in memory, and strip it from the URL.
+// This survives the S3→Express split in the published sandbox (no cookie needed).
+let _authToken: string = "";
+
+function initToken() {
+  const hash = window.location.hash; // e.g. "#__token=abc123" or "#/jack#__token=abc123"
+  const match = hash.match(/__token=([a-f0-9]+)/);
+  if (match) {
+    _authToken = match[1];
+    // Strip the token from the URL hash cleanly
+    const cleanHash = hash.replace(/[#&]?__token=[a-f0-9]+/, "").replace(/^#$/, "") || "#/";
+    window.history.replaceState(null, "", cleanHash || "/");
+  }
+}
+
+// Run once on module load
+if (typeof window !== "undefined") {
+  initToken();
+}
+
+export function getAuthToken() { return _authToken; }
+export function setAuthToken(t: string) { _authToken = t; }
+
+// ── Error helper ───────────────────────────────────────────────────────────────
 async function throwIfResNotOk(res: Response) {
   if (!res.ok) {
     const text = await res.text();
@@ -22,14 +47,20 @@ async function throwIfResNotOk(res: Response) {
   }
 }
 
-// ─── apiRequest ───────────────────────────────────────────────────────────────
+// ── Auth headers helper ────────────────────────────────────────────────────────
+function authHeaders(extra: Record<string, string> = {}): Record<string, string> {
+  const h: Record<string, string> = { ...extra };
+  if (_authToken) h["x-auth-token"] = _authToken;
+  return h;
+}
+
+// ── apiRequest ─────────────────────────────────────────────────────────────────
 export async function apiRequest(
   method: string,
   url: string,
   data?: unknown,
 ): Promise<Response> {
-  const headers: Record<string, string> = {};
-  if (data) headers["Content-Type"] = "application/json";
+  const headers = authHeaders(data ? { "Content-Type": "application/json" } : {});
 
   const res = await fetch(`${API_BASE}${url}`, {
     method,
@@ -42,14 +73,13 @@ export async function apiRequest(
   return res;
 }
 
-// ─── Backend availability ─────────────────────────────────────────────────────
+// ── Backend availability ───────────────────────────────────────────────────────
 let _backendAvailable: boolean | null = null;
 
 export function isBackendAvailable() { return _backendAvailable; }
 export function setBackendAvailable(v: boolean) { _backendAvailable = v; }
 
-// ─── localStorage → backend migration ────────────────────────────────────────
-// Runs once per session when the backend is empty but localStorage has data.
+// ── localStorage → backend migration ──────────────────────────────────────────
 let _migrationDone = false;
 
 async function migrateLocalStoreToBackend(): Promise<void> {
@@ -60,12 +90,12 @@ async function migrateLocalStoreToBackend(): Promise<void> {
   const localCollections = localStore.getCollections();
   const colItems = localStore.exportAll().colItems;
 
-  if (localItems.length === 0) return; // nothing to migrate
+  if (localItems.length === 0) return;
 
   try {
     const res = await fetch(`${API_BASE}/api/import`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: authHeaders({ "Content-Type": "application/json" }),
       body: JSON.stringify({ items: localItems, collections: localCollections, colItems }),
       signal: AbortSignal.timeout(10000),
     });
@@ -74,7 +104,6 @@ async function migrateLocalStoreToBackend(): Promise<void> {
 
     const { itemIdMap, colIdMap } = await res.json();
 
-    // Remap localStorage IDs to backend IDs so future mutations use correct IDs
     const remappedItems = localItems.map(item => ({
       ...item,
       id: itemIdMap[item.id] ?? item.id,
@@ -87,7 +116,6 @@ async function migrateLocalStoreToBackend(): Promise<void> {
     }));
     localStore.replaceCollections(remappedCols);
 
-    // Remap colItems
     const remappedColItems: Record<number, number[]> = {};
     for (const [oldColId, oldItemIds] of Object.entries(colItems)) {
       const newColId = colIdMap[Number(oldColId)];
@@ -105,15 +133,16 @@ async function migrateLocalStoreToBackend(): Promise<void> {
   }
 }
 
-// ─── Default query function ───────────────────────────────────────────────────
-// On first load: if backend is empty but localStorage has data → migrate first.
-// After that: backend is source of truth; localStorage is kept in sync as fallback.
+// ── Default query function ─────────────────────────────────────────────────────
 export const getQueryFn: <T>(options: { on401: "returnNull" | "throw" }) => QueryFunction<T> =
   ({ on401 }) =>
   async ({ queryKey }) => {
     const key = queryKey[0] as string;
     try {
-      const res = await fetch(`${API_BASE}${key}`, { signal: AbortSignal.timeout(5000) });
+      const res = await fetch(`${API_BASE}${key}`, {
+        headers: authHeaders(),
+        signal: AbortSignal.timeout(5000),
+      });
 
       if (on401 === "returnNull" && res.status === 401) return null as T;
       await throwIfResNotOk(res);
@@ -121,24 +150,23 @@ export const getQueryFn: <T>(options: { on401: "returnNull" | "throw" }) => Quer
       const data = await res.json();
       setBackendAvailable(true);
 
-      // If backend returned empty items but localStorage has data → migrate
       if (key === "/api/items" && (data as any[]).length === 0 && localStore.getItems().length > 0) {
         await migrateLocalStoreToBackend();
-        // Re-fetch after migration
-        const res2 = await fetch(`${API_BASE}/api/items`, { signal: AbortSignal.timeout(5000) });
+        const res2 = await fetch(`${API_BASE}/api/items`, {
+          headers: authHeaders(),
+          signal: AbortSignal.timeout(5000),
+        });
         const data2 = await res2.json();
         localStore.replaceItems(data2);
         return data2 as T;
       }
 
-      // Sync localStore from backend (source of truth)
       if (key === "/api/items") localStore.replaceItems(data);
       if (key === "/api/collections") localStore.replaceCollections(data);
 
       return data as T;
     } catch {
       setBackendAvailable(false);
-      // Fall back to localStore (offline / GitHub Pages static)
       if (key === "/api/items") return localStore.getItems() as T;
       if (key.startsWith("/api/collections") && !key.includes("/items")) return localStore.getCollections() as T;
       return [] as T;

@@ -1,7 +1,6 @@
 import "dotenv/config";
 import express, { Response, NextFunction } from 'express';
 import type { Request } from 'express';
-import session from "express-session";
 import { registerRoutes } from "./routes";
 import { serveStatic } from "./static";
 import { createServer } from "node:http";
@@ -15,24 +14,29 @@ declare module "http" {
   }
 }
 
-// ── Session ────────────────────────────────────────────────────────────────────
-app.set("trust proxy", 1);
-app.use(session({
-  name: "__Host-fs",
-  secret: process.env.SESSION_SECRET || "framestack-session-secret",
-  resave: false,
-  saveUninitialized: false,
-  cookie: {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "lax",
-    path: "/",
-    maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
-  },
-}));
-
-// ── Password gate ──────────────────────────────────────────────────────────────
+// ── Auth token ────────────────────────────────────────────────────────────────
+// A simple static token derived from the password. No sessions needed — the
+// React app reads the token from the URL after login and attaches it as a
+// header on every API request. This works across the S3 + Express proxy split
+// in the published sandbox where session cookies don't survive.
 const PASSWORD = process.env.SITE_PASSWORD!;
+// Stable token: sha256-like hash of the password (deterministic, no JWT lib needed)
+function makeToken(pw: string): string {
+  // simple but adequate: interleave char codes + rotate
+  let h = 0x811c9dc5;
+  for (let i = 0; i < pw.length; i++) {
+    h ^= pw.charCodeAt(i);
+    h = (Math.imul(h, 0x01000193) >>> 0);
+  }
+  // second pass for extra diffusion
+  let h2 = 0xdeadbeef;
+  for (let i = pw.length - 1; i >= 0; i--) {
+    h2 ^= pw.charCodeAt(i);
+    h2 = (Math.imul(h2, 0x01000193) >>> 0);
+  }
+  return `${h.toString(16).padStart(8,"0")}${h2.toString(16).padStart(8,"0")}${pw.length.toString(16)}`;
+}
+const VALID_TOKEN = PASSWORD ? makeToken(PASSWORD) : "";
 
 const LOGIN_HTML = `<!DOCTYPE html>
 <html lang="en">
@@ -58,54 +62,21 @@ const LOGIN_HTML = `<!DOCTYPE html>
     display:flex;flex-direction:column;align-items:center;gap:1.5rem;
     box-shadow:0 8px 40px #0005;
   }
-  .logo{
-    font-size:2.2rem;
-    line-height:1;
-  }
-  h1{
-    font-size:1.1rem;
-    font-weight:700;
-    letter-spacing:-.01em;
-    color:#e2e4f0;
-  }
-  p{
-    font-size:.8rem;
-    color:#6b7099;
-    text-align:center;
-    line-height:1.5;
-  }
+  .logo{font-size:2.2rem;line-height:1}
+  h1{font-size:1.1rem;font-weight:700;letter-spacing:-.01em;color:#e2e4f0}
+  p{font-size:.8rem;color:#6b7099;text-align:center;line-height:1.5}
   form{width:100%;display:flex;flex-direction:column;gap:.75rem}
   input{
-    width:100%;
-    background:#1c1f36;
-    border:1px solid #2a2d4a;
-    border-radius:10px;
-    padding:.65rem 1rem;
-    font-size:.9rem;
-    color:#e2e4f0;
-    outline:none;
-    transition:border-color .15s;
+    width:100%;background:#1c1f36;border:1px solid #2a2d4a;border-radius:10px;
+    padding:.65rem 1rem;font-size:.9rem;color:#e2e4f0;outline:none;transition:border-color .15s;
   }
   input:focus{border-color:#7c5cfc}
   button{
-    width:100%;
-    background:#7c5cfc;
-    color:#fff;
-    border:none;
-    border-radius:10px;
-    padding:.7rem;
-    font-size:.9rem;
-    font-weight:700;
-    cursor:pointer;
-    transition:opacity .15s;
+    width:100%;background:#7c5cfc;color:#fff;border:none;border-radius:10px;
+    padding:.7rem;font-size:.9rem;font-weight:700;cursor:pointer;transition:opacity .15s;
   }
   button:hover{opacity:.85}
-  .err{
-    font-size:.78rem;
-    color:#f87171;
-    text-align:center;
-    display:none;
-  }
+  .err{font-size:.78rem;color:#f87171;text-align:center;display:none}
   .err.show{display:block}
 </style>
 </head>
@@ -123,25 +94,54 @@ const LOGIN_HTML = `<!DOCTYPE html>
 </body>
 </html>`;
 
-function isAuthenticated(req: Request): boolean {
-  return (req.session as any).authed === true;
-}
-
-// Handle login POST
+// ── Login POST — validates password, redirects with token in URL hash ──────────
 app.post("/__auth", express.urlencoded({ extended: false }), (req: Request, res: Response) => {
   if (req.body?.password === PASSWORD) {
-    (req.session as any).authed = true;
-    res.redirect(req.query.next ? String(req.query.next) : "/");
+    // Pass token via URL hash so the React SPA can read it from window.location.hash
+    // and store it in memory (no localStorage/cookie needed)
+    res.redirect(`/#__token=${VALID_TOKEN}`);
   } else {
     res.status(401).send(LOGIN_HTML.replace("{{ERR_CLASS}}", "show"));
   }
 });
 
-// Gate every request
+// ── HTML gate — show login page for unauthenticated requests to index.html ────
+// API routes are protected separately below (x-auth-token header check).
+// Static assets (/assets/*, favicons) are served freely by static.ts so the
+// login page can load its own CSS/JS.
+function isHtmlRequest(req: Request): boolean {
+  const accept = req.headers.accept || "";
+  return accept.includes("text/html");
+}
+
 app.use((req: Request, res: Response, next: NextFunction) => {
+  // Always allow: the auth endpoint itself, static assets, API routes
   if (req.path === "/__auth") return next();
-  if (isAuthenticated(req)) return next();
-  res.status(401).send(LOGIN_HTML.replace("{{ERR_CLASS}}", ""));
+  if (req.path.startsWith("/assets/")) return next();
+  if (req.path.startsWith("/api/")) return next();
+  if (["/favicon.svg", "/favicon-32.png", "/favicon-512.png", "/apple-touch-icon.png"].includes(req.path)) return next();
+
+  // For HTML navigation — check if the browser already knows the token via referrer
+  // We can't check session here; instead just serve the login page for non-API requests
+  // if they don't carry a valid x-auth-token. HTML requests come from browser nav, not
+  // from the React app — so we always show login page (React reads token from hash).
+  if (isHtmlRequest(req)) {
+    // Serve login page — React will re-attach token from URL hash after login
+    res.send(LOGIN_HTML.replace("{{ERR_CLASS}}", ""));
+    return;
+  }
+
+  next();
+});
+
+// ── API auth middleware — check x-auth-token header ────────────────────────────
+app.use("/api", (req: Request, res: Response, next: NextFunction) => {
+  const token = req.headers["x-auth-token"] as string | undefined;
+  if (!token || token !== VALID_TOKEN) {
+    res.status(401).json({ error: "Unauthorized" });
+    return;
+  }
+  next();
 });
 
 app.use(
