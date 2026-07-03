@@ -67,25 +67,52 @@ const COLLECTION_TABS: Array<{ key: TabKey; label: string; Icon: any }> = [
   { key: "custom", label: "Custom", Icon: Sparkles },
 ];
 
-function CoverMosaic({ covers }: { covers: string[] }) {
-  const filled = covers.slice(0, 4);
-  if (filled.length === 0) {
-    return (
-      <div className="w-16 h-20 rounded-xl bg-secondary flex items-center justify-center shrink-0">
-        <Layers size={16} className="text-muted-foreground/30" />
-      </div>
-    );
-  }
+// A horizontal strip of up to 5 covers at the top of each collection card.
+// Always visible — shows covers when available, faded placeholders otherwise.
+function CoverStrip({ covers, accent, count }: { covers: string[]; accent: string; count: number }) {
+  // Show up to 5 slots; fill with placeholder divs if fewer covers
+  const slots = 5;
+  const filled = covers.slice(0, slots);
+  const empty  = slots - filled.length;
+
   return (
-    <div className="w-16 h-20 rounded-xl overflow-hidden grid grid-cols-2 grid-rows-2 shrink-0 border border-border/40">
+    <div className="flex gap-0.5 w-full h-20 rounded-xl overflow-hidden">
       {filled.map((src, i) => (
-        <div key={i} className="overflow-hidden bg-secondary">
-          <img src={src} alt="" className="w-full h-full object-cover" loading="lazy"
-            onError={e => { (e.target as HTMLImageElement).style.display = "none"; }} />
+        <div
+          key={i}
+          className="relative flex-1 overflow-hidden bg-secondary min-w-0"
+        >
+          <img
+            src={src}
+            alt=""
+            className="w-full h-full object-cover"
+            loading="lazy"
+            onError={e => {
+              const el = e.target as HTMLImageElement;
+              el.style.display = "none";
+              // show the fallback sibling
+              (el.nextElementSibling as HTMLElement | null)?.style.setProperty("display", "flex");
+            }}
+          />
+          {/* Fallback shown only if img errors */}
+          <div
+            className="absolute inset-0 items-center justify-center hidden"
+            style={{ background: `${accent}18` }}
+          >
+            <Layers size={12} style={{ color: `${accent}60` }} />
+          </div>
         </div>
       ))}
-      {Array.from({ length: 4 - filled.length }).map((_, i) => (
-        <div key={`e${i}`} className="bg-secondary/60" />
+      {Array.from({ length: empty }).map((_, i) => (
+        <div
+          key={`e${i}`}
+          className="flex-1 flex items-center justify-center min-w-0"
+          style={{ background: `${accent}${i === 0 && filled.length === 0 ? "14" : "08"}` }}
+        >
+          {i === 0 && filled.length === 0 && (
+            <Layers size={14} style={{ color: `${accent}40` }} />
+          )}
+        </div>
       ))}
     </div>
   );
@@ -533,11 +560,10 @@ function CollectionCard({
   onClick: () => void;
   itemsData?: any[];
 }) {
-  // Use prefetched items data if provided, otherwise fall back to cache
   const qc = useQueryClient();
   const cachedItems = itemsData ?? (qc.getQueryData<any[]>(["/api/collections", col.id, "items"]) || []);
   const covers = cachedItems
-    .filter((i: any) => !!i.coverUrl).map((i: any) => i.coverUrl as string).slice(0, 4);
+    .filter((i: any) => !!i.coverUrl).map((i: any) => i.coverUrl as string);
   const count = cachedItems.length;
   const statusColor = col.defaultStatus ? (STATUS_COLORS[col.defaultStatus] ?? null) : null;
 
@@ -545,9 +571,9 @@ function CollectionCard({
     <div
       data-testid={`card-collection-${col.id}`}
       className={cn(
-        "group relative rounded-2xl border border-border bg-card p-4",
+        "group relative rounded-2xl border border-border bg-card overflow-hidden",
         "hover:shadow-xl transition-all duration-300 cursor-pointer",
-        "animate-card-rise hover-glow"
+        "animate-card-rise"
       )}
       onClick={onClick}
       onMouseEnter={e => {
@@ -559,64 +585,58 @@ function CollectionCard({
         (e.currentTarget as HTMLElement).style.boxShadow = "";
       }}
     >
-      <div className="flex items-start gap-3">
-        <CoverMosaic covers={covers} />
-        <div className="flex-1 min-w-0">
-          <div className="flex items-start justify-between gap-2">
-            <div className="min-w-0 flex-1">
-              <div className="flex items-center gap-1.5 mb-0.5">
-                {statusColor && (
-                  <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: statusColor }} />
-                )}
-                <h3 className="font-bold text-sm text-foreground truncate">{col.name}</h3>
-              </div>
-              {col.description && (
-                <p className="text-xs text-muted-foreground line-clamp-2 leading-relaxed">{col.description}</p>
-              )}
-              <div className="flex items-center gap-2 mt-2">
-                <p className="text-[10px] text-muted-foreground/50 flex items-center gap-1">
-                  <Layers size={9} />
-                  {count} item{count !== 1 ? "s" : ""}
-                </p>
-                {isDefault && col.mediaGroup && (
-                  <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-secondary text-muted-foreground capitalize">
-                    {col.mediaGroup}
-                  </span>
-                )}
-              </div>
-            </div>
-            {!isDefault && (
-              <div className="shrink-0 flex items-center gap-0.5" onClick={e => e.stopPropagation()}>
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <button
-                      data-testid={`button-col-menu-${col.id}`}
-                      className="w-7 h-7 rounded-lg flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"
-                    >
-                      <MoreHorizontal size={13} />
-                    </button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end" className="w-32">
-                    <DropdownMenuItem onClick={onEdit}>
-                      <Edit3 size={12} className="mr-2" />Edit
-                    </DropdownMenuItem>
-                    <DropdownMenuSeparator />
-                    <DropdownMenuItem
-                      className="text-destructive focus:text-destructive"
-                      onClick={onDelete}
-                    >
-                      <Trash2 size={12} className="mr-2" />Delete
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-                <ChevronRight size={12} className="text-muted-foreground/30 group-hover:text-muted-foreground transition-colors" />
-              </div>
+      {/* Cover strip — always visible at the top */}
+      <CoverStrip covers={covers} accent={meta.accent} count={count} />
+
+      {/* Info row below the strip */}
+      <div className="flex items-center justify-between gap-2 px-3 py-2.5">
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-1.5">
+            {statusColor && (
+              <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: statusColor }} />
             )}
-            {isDefault && (
-              <ChevronRight size={12} className="text-muted-foreground/30 group-hover:text-muted-foreground transition-colors shrink-0 mt-1" />
+            <h3 className="font-bold text-sm text-foreground truncate">{col.name}</h3>
+          </div>
+          <div className="flex items-center gap-2 mt-0.5">
+            <p className="text-[10px] text-muted-foreground/50 flex items-center gap-1">
+              <Layers size={9} />
+              {count} item{count !== 1 ? "s" : ""}
+            </p>
+            {col.description && (
+              <p className="text-[10px] text-muted-foreground/40 truncate">{col.description}</p>
             )}
           </div>
         </div>
+
+        {!isDefault ? (
+          <div className="shrink-0 flex items-center gap-0.5" onClick={e => e.stopPropagation()}>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button
+                  data-testid={`button-col-menu-${col.id}`}
+                  className="w-7 h-7 rounded-lg flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"
+                >
+                  <MoreHorizontal size={13} />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-32">
+                <DropdownMenuItem onClick={onEdit}>
+                  <Edit3 size={12} className="mr-2" />Edit
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  className="text-destructive focus:text-destructive"
+                  onClick={onDelete}
+                >
+                  <Trash2 size={12} className="mr-2" />Delete
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+            <ChevronRight size={12} className="text-muted-foreground/30 group-hover:text-muted-foreground transition-colors" />
+          </div>
+        ) : (
+          <ChevronRight size={12} className="text-muted-foreground/30 group-hover:text-muted-foreground transition-colors shrink-0" />
+        )}
       </div>
     </div>
   );
