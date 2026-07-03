@@ -386,6 +386,11 @@ export async function registerRoutes(httpServer: Server, app: Express) {
         links.push(...lks);
       }
 
+      // Collect all quotes
+      const jackQuotes = storage.getQuotesByOwner("jack");
+      const sallyQuotes = storage.getQuotesByOwner("sally");
+      const allQuotes = [...jackQuotes, ...sallyQuotes];
+
       // Collect all secret messages
       const secretMessages = [
         ...storage.getMessagesFor("jack"),
@@ -401,6 +406,7 @@ export async function registerRoutes(httpServer: Server, app: Express) {
         profiles,
         linkLists,
         links,
+        quotes: allQuotes,
         secretMessages,
       };
 
@@ -489,6 +495,39 @@ export async function registerRoutes(httpServer: Server, app: Express) {
   app.get("/api/search/books", async (req, res) => {
     req.url = req.url.replace("/books", "/book");
     app._router.handle(req, res, () => {});
+  });
+
+  // ─── Quotes ───────────────────────────────────────────────────────────────────
+
+  // GET /api/quotes/:owner
+  app.get("/api/quotes/:owner", (req, res) => {
+    const { owner } = req.params;
+    if (owner !== "jack" && owner !== "sally") return res.status(400).json({ error: "Invalid owner" });
+    res.json(storage.getQuotesByOwner(owner));
+  });
+
+  // POST /api/quotes
+  app.post("/api/quotes", (req, res) => {
+    const { owner, text, author } = req.body;
+    if (!owner || !text || !author) return res.status(400).json({ error: "owner, text, author required" });
+    if (owner !== "jack" && owner !== "sally") return res.status(400).json({ error: "Invalid owner" });
+    const q = storage.createQuote({ owner, text, author });
+    res.status(201).json(q);
+  });
+
+  // PATCH /api/quotes/:id
+  app.patch("/api/quotes/:id", (req, res) => {
+    const id = parseInt(req.params.id);
+    const { text, author } = req.body;
+    const updated = storage.updateQuote(id, { ...(text && { text }), ...(author && { author }) });
+    if (!updated) return res.status(404).json({ error: "Quote not found" });
+    res.json(updated);
+  });
+
+  // DELETE /api/quotes/:id
+  app.delete("/api/quotes/:id", (req, res) => {
+    storage.deleteQuote(parseInt(req.params.id));
+    res.json({ ok: true });
   });
 
   // ─── Secret Messages ────────────────────────────────────────────────────────────

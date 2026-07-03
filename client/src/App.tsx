@@ -229,9 +229,11 @@ export default function App() {
             <Route path="/library" component={LibraryPage} />
             <Route path="/jack">{() => <JackPage sub="profile" />}</Route>
             <Route path="/jack/collections">{() => <JackPage sub="collections" />}</Route>
+            <Route path="/jack/quotes">{() => <JackPage sub="quotes" />}</Route>
             <Route path="/jack/messages">{() => <JackPage sub="messages" />}</Route>
             <Route path="/sally">{() => <SallyPage sub="profile" />}</Route>
             <Route path="/sally/collections">{() => <SallyPage sub="collections" />}</Route>
+            <Route path="/sally/quotes">{() => <SallyPage sub="quotes" />}</Route>
             <Route path="/sally/messages">{() => <SallyPage sub="messages" />}</Route>
             <Route path="/together">{() => <TogetherPage sub="profile" />}</Route>
             <Route path="/together/collections">{() => <TogetherPage sub="collections" />}</Route>

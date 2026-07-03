@@ -3,6 +3,7 @@ import { useLocation } from "wouter";
 import OwnerProfilePage from "./owner-profile";
 import OwnerCollectionsPage from "./owner-collections";
 import SecretMessagesTab from "@/components/SecretMessages";
+import QuotesTab from "@/components/QuotesTab";
 import OwnerIntro from "@/components/OwnerIntro";
 import { navHistory } from "@/lib/navHistory";
 import { cn } from "@/lib/utils";
@@ -10,14 +11,19 @@ import { cn } from "@/lib/utils";
 const TABS = [
   { id: "profile",     label: "Profile",     path: "/sally" },
   { id: "collections", label: "Collections", path: "/sally/collections" },
+  { id: "quotes",      label: "✦ Quotes",    path: "/sally/quotes" },
   { id: "messages",    label: "💌 Letters",  path: "/sally/messages" },
 ];
-const accent = "hsl(330 75% 65%)";
+const accent     = "hsl(330 75% 65%)";
 const jackAccent = "hsl(220 80% 60%)";
 
 export default function SallyPage({ sub }: { sub?: string }) {
   const [, setLocation] = useLocation();
-  const tab = sub === "collections" ? "collections" : sub === "messages" ? "messages" : "profile";
+  const tab =
+    sub === "collections" ? "collections" :
+    sub === "quotes"      ? "quotes"      :
+    sub === "messages"    ? "messages"    : "profile";
+
   const [showIntro, setShowIntro] = useState(() => !navHistory.prev.startsWith("/sally"));
   const onDone = useCallback(() => setShowIntro(false), []);
 
@@ -25,7 +31,7 @@ export default function SallyPage({ sub }: { sub?: string }) {
     <div className="animate-page-in">
       {showIntro && <OwnerIntro owner="sally" accent={accent} onDone={onDone} />}
 
-      <div className="flex gap-1 p-1 rounded-2xl bg-secondary/60 border border-border mb-6 w-fit">
+      <div className="flex gap-1 p-1 rounded-2xl bg-secondary/60 border border-border mb-6 w-fit flex-wrap">
         {TABS.map(t => (
           <button
             key={t.id}
@@ -35,20 +41,18 @@ export default function SallyPage({ sub }: { sub?: string }) {
               tab === t.id ? "text-white shadow-sm" : "text-muted-foreground hover:text-foreground"
             )}
             style={tab === t.id ? { background: accent, boxShadow: `0 2px 10px ${accent}55` } : {}}
+            data-testid={`tab-sally-${t.id}`}
           >
             {t.label}
           </button>
         ))}
       </div>
 
-      {tab === "profile" && <OwnerProfilePage owner="sally" />}
+      {tab === "profile"     && <OwnerProfilePage owner="sally" />}
       {tab === "collections" && <OwnerCollectionsPage owner="sally" />}
-      {tab === "messages" && (
-        <SecretMessagesTab
-          owner="sally"
-          accentOwner={accent}
-          accentOther={jackAccent}
-        />
+      {tab === "quotes"      && <QuotesTab owner="sally" accent={accent} />}
+      {tab === "messages"    && (
+        <SecretMessagesTab owner="sally" accentOwner={accent} accentOther={jackAccent} />
       )}
     </div>
   );

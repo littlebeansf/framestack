@@ -1,6 +1,6 @@
 import { eq, and, desc } from "drizzle-orm";
 import {
-  users, items, collections, collectionItems, profiles, links, linkLists, secretMessages,
+  users, items, collections, collectionItems, profiles, links, linkLists, secretMessages, quotes,
   type User, type InsertUser,
   type Item, type InsertItem,
   type Collection, type InsertCollection,
@@ -9,6 +9,7 @@ import {
   type Link, type InsertLink,
   type LinkList, type InsertLinkList,
   type SecretMessage, type InsertSecretMessage,
+  type Quote, type InsertQuote,
   type ItemWithStatus,
   OWNERS, DEFAULT_COLLECTIONS,
 } from "@shared/schema";
@@ -100,6 +101,14 @@ sqlite.exec(`
     description TEXT,
     favicon TEXT,
     added_by TEXT,
+    created_at INTEGER NOT NULL DEFAULT 0
+  );
+
+  CREATE TABLE IF NOT EXISTS quotes (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    owner TEXT NOT NULL,
+    text TEXT NOT NULL,
+    author TEXT NOT NULL,
     created_at INTEGER NOT NULL DEFAULT 0
   );
 
@@ -269,6 +278,12 @@ export interface IStorage {
   updateLink(id: number, data: Partial<InsertLink>): Link | undefined;
   deleteLink(id: number): void;
 
+  // Quotes
+  getQuotesByOwner(owner: string): Quote[];
+  createQuote(data: InsertQuote): Quote;
+  updateQuote(id: number, data: Partial<InsertQuote>): Quote | undefined;
+  deleteQuote(id: number): void;
+
   // Secret Messages
   getMessagesFor(to: string): SecretMessage[];          // all messages for recipient
   getUnreadFor(to: string): SecretMessage[];             // unread (inbox) messages
@@ -428,6 +443,28 @@ export class Storage implements IStorage {
   }
   deleteLink(id: number) {
     db.delete(links).where(eq(links.id, id)).run();
+  }
+
+  // ── Quotes ─────────────────────────────────────────────────────────────
+  getQuotesByOwner(owner: string) {
+    return db.select().from(quotes)
+      .where(eq(quotes.owner, owner))
+      .orderBy(desc(quotes.createdAt))
+      .all();
+  }
+  createQuote(data: InsertQuote) {
+    return db.insert(quotes)
+      .values({ ...data, createdAt: Date.now() })
+      .returning().get();
+  }
+  updateQuote(id: number, data: Partial<InsertQuote>) {
+    return db.update(quotes)
+      .set(data)
+      .where(eq(quotes.id, id))
+      .returning().get();
+  }
+  deleteQuote(id: number) {
+    db.delete(quotes).where(eq(quotes.id, id)).run();
   }
 
   // ── Secret Messages ───────────────────────────────────────────────────────

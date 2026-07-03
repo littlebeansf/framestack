@@ -180,6 +180,22 @@ export const insertLinkSchema = createInsertSchema(links).omit({ id: true });
 export type InsertLink = z.infer<typeof insertLinkSchema>;
 export type Link = typeof links.$inferSelect;
 
+// ─── Quotes (per-owner collection) ─────────────────────────────────────────
+// Each owner (jack | sally) keeps their own quote collection.
+// author is a free-text field; the frontend derives the dropdown from existing authors.
+
+export const quotes = sqliteTable("quotes", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  owner: text("owner").notNull(),      // "jack" | "sally"
+  text: text("text").notNull(),        // the quote body
+  author: text("author").notNull(),    // free-text author name
+  createdAt: integer("created_at").notNull().default(0),
+});
+
+export const insertQuoteSchema = createInsertSchema(quotes).omit({ id: true });
+export type InsertQuote = z.infer<typeof insertQuoteSchema>;
+export type Quote = typeof quotes.$inferSelect;
+
 // ─── Secret Messages (jack ↔ sally) ──────────────────────────────────────────
 // from: "jack" | "sally"   — who wrote it
 // to:   "jack" | "sally"   — who receives it
