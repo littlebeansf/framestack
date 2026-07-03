@@ -494,16 +494,20 @@ const GLOBAL_STYLES = `
   }
   @keyframes owner-intro-bg {
     0%   { opacity: 1; }
-    85%  { opacity: 1; }
+    88%  { opacity: 1; }
     100% { opacity: 0; }
   }
 `;
 
 // ── Duration map per owner ───────────────────────────────────────────────────
+// Durations are set to cover the full animation + 500ms hold before fade.
+// Jack:     last element (stars) completes ~4.2s → 5000ms
+// Sally:    last element (petal fill) completes ~3.44s → 4500ms
+// Together: last element (heart draw + stars) completes ~3.2s → 4200ms
 const OWNER_DURATION: Record<string, number> = {
-  jack:     2000,
-  sally:    1500,
-  together: 1700,
+  jack:     5000,
+  sally:    4500,
+  together: 4200,
 };
 
 // ── Main export ───────────────────────────────────────────────────────────────
@@ -529,7 +533,7 @@ export default function OwnerIntro({
       className="fixed inset-0 z-50 flex items-center justify-center pointer-events-auto"
       aria-hidden
       style={{
-        backgroundColor: "black",
+        backgroundColor: "#0b0c14",
         animation: `owner-intro-bg ${dur / 1000}s ease forwards`,
       }}
     >

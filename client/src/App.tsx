@@ -33,7 +33,7 @@ function AnimationSplash({ onDone }: { onDone: () => void }) {
   }, [onDone]);
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center bg-black select-none">
+    <div className="min-h-screen flex flex-col items-center justify-center select-none" style={{ background: "#0b0c14" }}>
       <style>{`
         @keyframes draw-heart { to { stroke-dashoffset: 0; } }
         @keyframes fade-in-up { from { opacity:0;transform:translateY(4px);} to{opacity:1;transform:translateY(0);} }
