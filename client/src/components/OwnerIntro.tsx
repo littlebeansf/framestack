@@ -53,64 +53,64 @@ function JackAnimation() {
       {[0, 0.25, 0.5].map((d, i) => (
         <circle key={i} cx="0" cy="0" r="0"
           stroke={JACK_BLUE} strokeWidth="1"
-          style={{ animation: `owner-ring 1.44s ease-out ${2.34 + d}s forwards`, opacity: 0 }}
+          style={{ animation: `owner-ring 0.6s ease-out ${1.0 + d * 0.44}s forwards`, opacity: 0 }}
         />
       ))}
 
       {/* ── Skull head (large circle) ── */}
       <circle cx="0" cy="-2" r={SKULL_R}
         stroke={JACK_BLUE} strokeWidth="2.4" strokeLinecap="round"
-        style={dash(Math.ceil(SKULL_LEN), 0.9, 0.09)}
+        style={dash(Math.ceil(SKULL_LEN), 0.4, 0.04)}
       />
 
       {/* ── Left cat ear (Hello Kitty style — two arcs forming a rounded triangle) ── */}
       {/* outer ear arc */}
       <path d="M-22 -18 Q-32 -40 -14 -42 Q-6 -36 -10 -24"
         stroke={JACK_BLUE} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" fill="none"
-        style={dash(52, 0.45, 1.0)}
+        style={dash(52, 0.2, 0.44)}
       />
       {/* inner ear fill line */}
       <path d="M-20 -20 Q-26 -36 -14 -38 Q-9 -34 -12 -25"
         stroke={JACK_BLUE} strokeWidth="1" strokeLinecap="round" strokeOpacity="0.4" fill="none"
-        style={dash(38, 0.3, 1.5)}
+        style={dash(38, 0.13, 0.66)}
       />
 
       {/* ── Right cat ear ── */}
       <path d="M22 -18 Q32 -40 14 -42 Q6 -36 10 -24"
         stroke={JACK_BLUE} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" fill="none"
-        style={dash(52, 0.45, 1.15)}
+        style={dash(52, 0.2, 0.51)}
       />
       <path d="M20 -20 Q26 -36 14 -38 Q9 -34 12 -25"
         stroke={JACK_BLUE} strokeWidth="1" strokeLinecap="round" strokeOpacity="0.4" fill="none"
-        style={dash(38, 0.3, 1.65)}
+        style={dash(38, 0.13, 0.73)}
       />
 
       {/* ── X left eye ── */}
       <path d="M-12 -10 L-6 -4" stroke={JACK_BLUE} strokeWidth="2.2" strokeLinecap="round"
-        style={dash(9, 0.22, 1.8)}
+        style={dash(9, 0.1, 0.79)}
       />
       <path d="M-6 -10 L-12 -4" stroke={JACK_BLUE} strokeWidth="2.2" strokeLinecap="round"
-        style={dash(9, 0.22, 2.0)}
+        style={dash(9, 0.1, 0.88)}
       />
 
       {/* ── X right eye ── */}
       <path d="M6 -10 L12 -4" stroke={JACK_BLUE} strokeWidth="2.2" strokeLinecap="round"
-        style={dash(9, 0.22, 1.9)}
+        style={dash(9, 0.1, 0.84)}
       />
       <path d="M12 -10 L6 -4" stroke={JACK_BLUE} strokeWidth="2.2" strokeLinecap="round"
-        style={dash(9, 0.22, 2.1)}
+        style={dash(9, 0.1, 0.92)}
       />
 
       {/* ── Dot nose ── */}
       <circle cx="0" cy="1" r="1.8"
         fill={JACK_BLUE} fillOpacity="0.7"
-        style={{ opacity: 0, animation: `owner-pop 0.36s ease 2.25s forwards` }}
+        style={{ opacity: 0, animation: `owner-pop 0.36s ease 0.99s forwards` }}
       />
 
       {/* ── Wavy smile (skull-style, slightly jagged) ── */}
       <path d="M-9 8 Q-5 13 0 11 Q5 9 9 13"
         stroke={JACK_BLUE} strokeWidth="2" strokeLinecap="round" fill="none"
-        style={dash(28, 0.36, 2.34)}
+        style={dash(28, 0.16, 1.03)}
       />
 
       {/* ── Whisker dots — 3 each side ── */}
@@ -118,7 +118,7 @@ function JackAnimation() {
       {[[-32, -3], [-30, 2], [-32, 7]].map(([wx, wy], i) => (
         <circle key={`wl${i}`} cx={wx} cy={wy} r="1.4"
           fill={JACK_BLUE} fillOpacity="0.55"
-          style={{ opacity: 0, animation: `owner-pop 0.2s ease ${2.52 + i * 0.1}s forwards` }}
+          style={{ opacity: 0, animation: `owner-pop 0.09s ease ${2.52 + i * 0.1}s forwards` }}
         />
       ))}
       {/* right whiskers */}
@@ -133,33 +133,33 @@ function JackAnimation() {
       {/* left lobe of bow */}
       <path d="M10 -40 Q6 -46 10 -50 Q14 -46 10 -40Z"
         stroke={JACK_BLUE} strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" fill="none"
-        style={dash(28, 0.28, 2.7)}
+        style={dash(28, 0.12, 1.19)}
       />
       {/* right lobe of bow */}
       <path d="M18 -40 Q22 -46 18 -50 Q14 -46 18 -40Z"
         stroke={JACK_BLUE} strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" fill="none"
-        style={dash(28, 0.28, 2.88)}
+        style={dash(28, 0.12, 1.27)}
       />
       {/* bow knot centre */}
       <circle cx="14" cy="-43" r="2.2"
         stroke={JACK_BLUE} strokeWidth="1.4" fill="none"
-        style={dash(14, 0.18, 3.06)}
+        style={dash(14, 0.08, 1.35)}
       />
 
       {/* ── Subtle crack line on skull dome ── */}
       <path d="M-3 -24 Q0 -18 2 -22 Q4 -18 6 -24"
         stroke={JACK_BLUE} strokeWidth="1" strokeLinecap="round" fill="none" strokeOpacity="0.5"
-        style={dash(20, 0.22, 3.2)}
+        style={dash(20, 0.1, 1.41)}
       />
 
       {/* ── Crossbones below skull ── */}
       {/* left bone */}
       <path d="M-14 24 L14 38" stroke={JACK_BLUE} strokeWidth="1.8" strokeLinecap="round"
-        style={dash(32, 0.3, 3.3)}
+        style={dash(32, 0.13, 1.45)}
       />
       {/* right bone (opposite direction) */}
       <path d="M14 24 L-14 38" stroke={JACK_BLUE} strokeWidth="1.8" strokeLinecap="round"
-        style={dash(32, 0.3, 3.45)}
+        style={dash(32, 0.13, 1.52)}
       />
       {/* bone end knobs */}
       {[[-14,24],[14,38],[14,24],[-14,38]].map(([bx,by],i) => (
@@ -173,14 +173,14 @@ function JackAnimation() {
       <text x="0" y="58" textAnchor="middle"
         fontSize="8" fontFamily="Cabinet Grotesk, sans-serif" fontWeight="800"
         fill={JACK_BLUE} letterSpacing="2.5"
-        style={{ opacity: 0, animation: `owner-fade-up 0.63s ease 3.96s forwards` }}
+        style={{ opacity: 0, animation: `owner-fade-up 0.63s ease 1.74s forwards` }}
       >JACK</text>
 
       {/* Tiny stars scatter */}
       {[[-40,-45,"✦",JACK_BLUE,4.05,7],[42,-30,"✦",GLASS_CLR,4.14,6],[-34,22,"·",JACK_BLUE,4.23,10]].map(([x,y,ch,col,d,sz],i) => (
         <text key={i} x={x as number} y={y as number}
           textAnchor="middle" fontSize={sz as number} fill={col as string} fontWeight="bold"
-          style={{ opacity: 0, animation: `owner-fade-up 0.72s ease ${d}s forwards` }}
+          style={{ opacity: 0, animation: `owner-fade-up 0.32s ease ${d}s forwards` }}
         >{ch as string}</text>
       ))}
     </svg>
@@ -217,7 +217,7 @@ function SallyAnimation() {
       {[0, 0.29, 0.58].map((d, i) => (
         <circle key={i} cx={BLOOM_CX} cy={BLOOM_CY} r="0"
           stroke={SALLY_PINK} strokeWidth="1"
-          style={{ animation: `owner-ring 1.44s ease-out ${2.34 + d}s forwards`, opacity: 0 }}
+          style={{ animation: `owner-ring 0.6s ease-out ${1.0 + d * 0.44}s forwards`, opacity: 0 }}
         />
       ))}
 
@@ -227,17 +227,17 @@ function SallyAnimation() {
         style={dash(BRANCH_LEN, 0.9, 0.09)}
       />
       <path d={SIDE_L} stroke={`hsl(30 35% 45%)`} strokeWidth="2" strokeLinecap="round" fill="none"
-        style={dash(36, 0.54, 0.94)}
+        style={dash(36, 0.24, 0.41)}
       />
       <path d={SIDE_R} stroke={`hsl(30 35% 45%)`} strokeWidth="1.6" strokeLinecap="round" fill="none"
-        style={dash(24, 0.43, 1.04)}
+        style={dash(24, 0.19, 0.46)}
       />
       {/* Small twig buds */}
       <path d="M-22 -24 Q-26 -30 -24 -34" stroke={`hsl(30 35% 45%)`} strokeWidth="1.4" strokeLinecap="round" fill="none"
-        style={dash(14, 0.32, 1.3)}
+        style={dash(14, 0.14, 0.57)}
       />
       <path d="M18 -28 Q22 -34 20 -38" stroke={`hsl(30 35% 45%)`} strokeWidth="1.4" strokeLinecap="round" fill="none"
-        style={dash(14, 0.32, 1.37)}
+        style={dash(14, 0.14, 0.6)}
       />
 
       {/* 5 petals — stroked first (outline), then fill fades in */}
@@ -270,7 +270,7 @@ function SallyAnimation() {
       {/* Pistil centre */}
       <circle cx={BLOOM_CX} cy={BLOOM_CY} r="3"
         stroke={SALLY_PINK} strokeWidth="1.5" fill="none"
-        style={dash(19, 0.4, 2.12)}
+        style={dash(19, 0.18, 0.93)}
       />
 
       {/* Small blossom at side twig */}
@@ -303,14 +303,14 @@ function SallyAnimation() {
       <text x="0" y="38" textAnchor="middle"
         fontSize="8" fontFamily="Cabinet Grotesk, sans-serif" fontWeight="800"
         fill={SALLY_PINK} letterSpacing="2.5"
-        style={{ opacity: 0, animation: `owner-fade-up 0.63s ease 2.43s forwards` }}
+        style={{ opacity: 0, animation: `owner-fade-up 0.63s ease 1.07s forwards` }}
       >SALLY</text>
 
       {/* Sparkle stars */}
       {[[36,-38,"✦",SALLY_PINK,2.2],[-40,-14,"✸",VIOLET,2.34],[30,22,"·",SALLY_PINK,2.48]].map(([x,y,ch,col,d],i) => (
         <text key={i} x={x as number} y={y as number}
           textAnchor="middle" fontSize={8} fill={col as string}
-          style={{ opacity: 0, animation: `owner-fade-up 0.72s ease ${d}s forwards` }}
+          style={{ opacity: 0, animation: `owner-fade-up 0.32s ease ${d}s forwards` }}
         >{ch as string}</text>
       ))}
 
@@ -360,34 +360,34 @@ function TogetherAnimation() {
       {[0, 0.29, 0.58].map((d, i) => (
         <circle key={i} cx="11" cy="-38" r="0"
           stroke={TOGETHER} strokeWidth="1"
-          style={{ animation: `owner-ring 1.44s ease-out ${2.79 + d}s forwards`, opacity: 0 }}
+          style={{ animation: `owner-ring 0.6s ease-out ${1.23 + d * 0.44}s forwards`, opacity: 0 }}
         />
       ))}
 
       {/* Floor */}
       <path d={FLOOR} stroke={TOGETHER} strokeWidth="2" strokeLinecap="round"
-        style={dash(44, 0.5, 0.09)}
+        style={dash(44, 0.22, 0.04)}
       />
 
       {/* Walls */}
       <path d={WALL_L} stroke={TOGETHER} strokeWidth="2.2" strokeLinecap="round"
-        style={dash(27, 0.43, 0.58)}
+        style={dash(27, 0.19, 0.26)}
       />
       <path d={WALL_R} stroke={TOGETHER} strokeWidth="2.2" strokeLinecap="round"
-        style={dash(27, 0.43, 0.72)}
+        style={dash(27, 0.19, 0.32)}
       />
 
       {/* Roof */}
       <path d={ROOF_L} stroke={TOGETHER} strokeWidth="2.4" strokeLinecap="round"
-        style={dash(30, 0.45, 1.08)}
+        style={dash(30, 0.2, 0.48)}
       />
       <path d={ROOF_R} stroke={TOGETHER} strokeWidth="2.4" strokeLinecap="round"
-        style={dash(30, 0.45, 1.22)}
+        style={dash(30, 0.2, 0.54)}
       />
 
       {/* Chimney */}
       <path d={CHIMNEY} stroke={TOGETHER} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
-        style={dash(50, 0.5, 1.58)}
+        style={dash(50, 0.22, 0.7)}
       />
 
       {/* Smoke */}
@@ -400,34 +400,34 @@ function TogetherAnimation() {
 
       {/* Door */}
       <path d={DOOR} stroke={TOGETHER} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"
-        style={dash(38, 0.5, 1.8)}
+        style={dash(38, 0.22, 0.79)}
       />
       {/* Door knob */}
       <circle cx="3.5" cy="16" r="1.2"
         fill={TOGETHER} fillOpacity="0.6"
-        style={{ opacity: 0, animation: `owner-pop 0.32s ease 2.38s forwards` }}
+        style={{ opacity: 0, animation: `owner-pop 0.32s ease 1.05s forwards` }}
       />
 
       {/* Windows */}
       <path d={WIN_L} stroke={TOGETHER} strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"
-        style={dash(38, 0.47, 1.94)}
+        style={dash(38, 0.21, 0.85)}
       />
       <path d={WIN_R} stroke={TOGETHER} strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"
-        style={dash(38, 0.47, 2.09)}
+        style={dash(38, 0.21, 0.92)}
       />
       <path d={WIN_CROSS_L} stroke={TOGETHER} strokeWidth="1" strokeLinecap="round" strokeOpacity="0.6"
-        style={dash(18, 0.32, 2.27)}
+        style={dash(18, 0.14, 1.0)}
       />
       <path d={WIN_CROSS_R} stroke={TOGETHER} strokeWidth="1" strokeLinecap="round" strokeOpacity="0.6"
-        style={dash(18, 0.32, 2.34)}
+        style={dash(18, 0.14, 1.03)}
       />
 
       {/* Window glow — soft fill */}
       <rect x="-18" y="-1" width="8" height="6" fill={TOGETHER} fillOpacity="0"
-        style={{ animation: `owner-fill-blush 0.9s ease 2.45s forwards` }}
+        style={{ animation: `owner-fill-blush 0.4s ease 1.08s forwards` }}
       />
       <rect x="10" y="-1" width="8" height="6" fill={TOGETHER} fillOpacity="0"
-        style={{ animation: `owner-fill-blush 0.9s ease 2.45s forwards` }}
+        style={{ animation: `owner-fill-blush 0.4s ease 1.08s forwards` }}
       />
 
       {/* Heart in the centre */}
@@ -438,25 +438,25 @@ function TogetherAnimation() {
       />
       {/* Tiny glasses on mini heart */}
       <circle cx="-2" cy="1" r="2" stroke={GLASS_CLR} strokeWidth="1" fill="none"
-        style={dash(13, 0.32, 3.24)}
+        style={dash(13, 0.14, 1.43)}
       />
       <circle cx="2" cy="1" r="2" stroke={GLASS_CLR} strokeWidth="1" fill="none"
-        style={dash(13, 0.32, 3.38)}
+        style={dash(13, 0.14, 1.49)}
       />
       <path d="M0 1 H0.2" stroke={GLASS_CLR} strokeWidth="1" strokeLinecap="round"
-        style={dash(2, 0.18, 3.53)}
+        style={dash(2, 0.08, 1.55)}
       />
 
       {/* Heart glow fill */}
       <path d={MINI_HEART} fill={VIOLET} fillOpacity="0" stroke="none"
-        style={{ animation: `owner-fill-blush 0.81s ease 3.28s forwards` }}
+        style={{ animation: `owner-fill-blush 0.36s ease 1.44s forwards` }}
       />
 
       {/* Stars / sparkles */}
       {[[-38,-40,"✦",TOGETHER,2.52],[36,-20,"✸",VIOLET,2.66],[-28,30,"·",TOGETHER,2.79]].map(([x,y,ch,col,d],i)=>(
         <text key={i} x={x as number} y={y as number}
           textAnchor="middle" fontSize={8} fill={col as string}
-          style={{ opacity: 0, animation: `owner-fade-up 0.72s ease ${d}s forwards` }}
+          style={{ opacity: 0, animation: `owner-fade-up 0.32s ease ${d}s forwards` }}
         >{ch as string}</text>
       ))}
 
@@ -464,7 +464,7 @@ function TogetherAnimation() {
       <text x="0" y="42" textAnchor="middle"
         fontSize="8" fontFamily="Cabinet Grotesk, sans-serif" fontWeight="800"
         fill={TOGETHER} letterSpacing="2.5"
-        style={{ opacity: 0, animation: `owner-fade-up 0.63s ease 2.92s forwards` }}
+        style={{ opacity: 0, animation: `owner-fade-up 0.63s ease 1.28s forwards` }}
       >HOME</text>
     </svg>
   );
@@ -499,11 +499,11 @@ const GLOBAL_STYLES = `
   }
 `;
 
-// ── Duration map per owner (~1.8× original) ──────────────────────────────────
+// ── Duration map per owner ───────────────────────────────────────────────────
 const OWNER_DURATION: Record<string, number> = {
-  jack:     4500,
-  sally:    3060,
-  together: 3420,
+  jack:     2000,
+  sally:    1500,
+  together: 1700,
 };
 
 // ── Main export ───────────────────────────────────────────────────────────────

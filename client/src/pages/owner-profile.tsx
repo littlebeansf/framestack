@@ -205,7 +205,7 @@ export default function OwnerProfilePage({ owner }: { owner: string }) {
   const { data: profile, isLoading: profileLoading } = useQuery<Profile>({
     queryKey: ["/api/profiles", owner],
     queryFn: async () => {
-      const res = await fetch(`${(window as any).__API_BASE__ || ""}${API_BASE}/api/profiles/${owner}`);
+      const res = await fetch(`${API_BASE}/api/profiles/${owner}`);
       return res.json();
     },
   });

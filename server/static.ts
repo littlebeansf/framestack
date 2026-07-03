@@ -11,9 +11,15 @@ export function serveStatic(app: Express) {
     );
   }
 
-  app.use(express.static(distPath));
+  // Static assets (JS/CSS/images) are served without auth so the login page
+  // can load its own assets. Only .html falls through to the auth gate.
+  app.use("/assets", express.static(path.join(distPath, "assets")));
+  app.use("/favicon.svg",       express.static(path.join(distPath, "favicon.svg")));
+  app.use("/favicon-32.png",    express.static(path.join(distPath, "favicon-32.png")));
+  app.use("/favicon-512.png",   express.static(path.join(distPath, "favicon-512.png")));
+  app.use("/apple-touch-icon.png", express.static(path.join(distPath, "apple-touch-icon.png")));
 
-  // fall through to index.html if the file doesn't exist
+  // index.html and all other HTML routes go through the auth gate (registered in index.ts)
   app.use("/{*path}", (_req, res) => {
     res.sendFile(path.resolve(distPath, "index.html"));
   });
