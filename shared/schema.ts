@@ -190,6 +190,8 @@ export const quotes = sqliteTable("quotes", {
   text: text("text").notNull(),        // the quote body
   author: text("author").notNull(),    // free-text author name
   createdAt: integer("created_at").notNull().default(0),
+  isFeatured: integer("is_featured").notNull().default(0), // 0|1 boolean
+  featuredPos: integer("featured_pos").default(null),      // 1-5 ordering slot
 });
 
 export const insertQuoteSchema = createInsertSchema(quotes).omit({ id: true });

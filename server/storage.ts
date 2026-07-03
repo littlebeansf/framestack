@@ -131,6 +131,8 @@ try { sqlite.exec(`ALTER TABLE collections ADD COLUMN is_default INTEGER NOT NUL
 try { sqlite.exec(`ALTER TABLE collections ADD COLUMN media_group TEXT`); } catch {}
 try { sqlite.exec(`ALTER TABLE collections ADD COLUMN default_status TEXT`); } catch {}
 try { sqlite.exec(`ALTER TABLE collection_items ADD COLUMN status TEXT`); } catch {}
+try { sqlite.exec(`ALTER TABLE quotes ADD COLUMN is_featured INTEGER NOT NULL DEFAULT 0`); } catch {}
+try { sqlite.exec(`ALTER TABLE quotes ADD COLUMN featured_pos INTEGER`); } catch {}
 
 // Force Together avatar to 🏠 (user may have edited it to 🔥 via the UI)
 try { sqlite.exec(`UPDATE profiles SET avatar_emoji = '\ud83c\udfe0' WHERE owner = 'together' AND avatar_emoji != '\ud83c\udfe0'`); } catch {}
@@ -349,7 +351,9 @@ export interface IStorage {
   // Quotes
   getQuotesByOwner(owner: string): Quote[];
   createQuote(data: InsertQuote): Quote;
-  updateQuote(id: number, data: Partial<InsertQuote>): Quote | undefined;
+  updateQuote(id: number, data: Partial<InsertQuote> & { isFeatured?: number; featuredPos?: number | null }): Quote | undefined;
+  setQuoteFeatured(id: number, featured: boolean): Quote | null;
+  reorderFeatured(owner: string, orderedIds: number[]): void;
   deleteQuote(id: number): void;
 
   // Secret Messages
@@ -525,11 +529,51 @@ export class Storage implements IStorage {
       .values({ ...data, createdAt: Date.now() })
       .returning().get();
   }
-  updateQuote(id: number, data: Partial<InsertQuote>) {
+  updateQuote(id: number, data: Partial<InsertQuote> & { isFeatured?: number; featuredPos?: number | null }) {
     return db.update(quotes)
       .set(data)
       .where(eq(quotes.id, id))
       .returning().get();
+  }
+  /**
+   * Toggle featured status on a quote.
+   * - If marking featured: assign the next available slot (1-5). If all 5 slots taken, returns null.
+   * - If un-featuring: clear isFeatured + featuredPos.
+   * - Returns the updated quote, or null if no slot available.
+   */
+  setQuoteFeatured(id: number, featured: boolean): Quote | null {
+    if (!featured) {
+      return db.update(quotes)
+        .set({ isFeatured: 0, featuredPos: null })
+        .where(eq(quotes.id, id))
+        .returning().get() ?? null;
+    }
+    // Find which owner this quote belongs to
+    const q = db.select().from(quotes).where(eq(quotes.id, id)).get();
+    if (!q) return null;
+    // Get current featured positions for this owner
+    const featured_rows = db.select().from(quotes)
+      .where(eq(quotes.owner, q.owner))
+      .all()
+      .filter(r => r.isFeatured === 1)
+      .sort((a, b) => (a.featuredPos ?? 99) - (b.featuredPos ?? 99));
+    if (featured_rows.length >= 5) return null; // slots full
+    const usedSlots = new Set(featured_rows.map(r => r.featuredPos));
+    let slot = 1;
+    while (usedSlots.has(slot) && slot <= 5) slot++;
+    return db.update(quotes)
+      .set({ isFeatured: 1, featuredPos: slot })
+      .where(eq(quotes.id, id))
+      .returning().get() ?? null;
+  }
+  /** Reorder featured quotes for an owner — accepts array of ids in desired order */
+  reorderFeatured(owner: string, orderedIds: number[]): void {
+    orderedIds.forEach((id, index) => {
+      db.update(quotes)
+        .set({ featuredPos: index + 1 })
+        .where(eq(quotes.id, id))
+        .run();
+    });
   }
   deleteQuote(id: number) {
     db.delete(quotes).where(eq(quotes.id, id)).run();

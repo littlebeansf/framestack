@@ -530,6 +530,24 @@ export async function registerRoutes(httpServer: Server, app: Express) {
     res.json({ ok: true });
   });
 
+  // POST /api/quotes/:id/feature — toggle featured (max 5 per owner)
+  app.post("/api/quotes/:id/feature", (req, res) => {
+    const id = parseInt(req.params.id);
+    const { featured } = req.body; // boolean
+    const updated = storage.setQuoteFeatured(id, !!featured);
+    if (updated === null && !!featured) return res.status(409).json({ error: "Max 5 featured quotes reached" });
+    if (!updated) return res.status(404).json({ error: "Quote not found" });
+    res.json(updated);
+  });
+
+  // POST /api/quotes/reorder-featured — reorder favorites for an owner
+  app.post("/api/quotes/reorder-featured", (req, res) => {
+    const { owner, orderedIds } = req.body;
+    if (!owner || !Array.isArray(orderedIds)) return res.status(400).json({ error: "owner and orderedIds required" });
+    storage.reorderFeatured(owner, orderedIds);
+    res.json({ ok: true });
+  });
+
   // ─── Secret Messages ────────────────────────────────────────────────────────────
 
   // GET /api/messages/:owner — all messages addressed to owner (for archive tab)
