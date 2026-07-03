@@ -85,23 +85,48 @@ const LOGIN_HTML = `<!DOCTYPE html>
   <div class="logo">🎬</div>
   <h1>Framestack</h1>
   <p>Your personal media universe.<br>Enter the password to continue.</p>
-  <form method="POST" action="/__auth">
-    <input type="password" name="password" placeholder="Password" autofocus autocomplete="current-password">
-    <div class="err {{ERR_CLASS}}">Wrong password — try again.</div>
+  <form id="lf">
+    <input id="pw" type="password" name="password" placeholder="Password" autofocus autocomplete="current-password">
+    <div class="err {{ERR_CLASS}}" id="err">Wrong password — try again.</div>
     <button type="submit">Enter</button>
   </form>
+  <script>
+  // In the published pplx.app sandbox, static routes go to S3 (POST blocked).
+  // Backend routes go through /port/5000/. Detect environment from the origin.
+  (function(){
+    // In the published sandbox we're at https://<slug>.pplx.app — backend is at /port/5000
+    // In dev (localhost) both are on the same port so no prefix needed.
+    var isProd = window.location.hostname.endsWith('.pplx.app');
+    var authUrl = isProd ? '/port/5000/__auth' : '/__auth';
+    document.getElementById('lf').addEventListener('submit', function(e){
+      e.preventDefault();
+      var pw = document.getElementById('pw').value;
+      fetch(authUrl, {
+        method: 'POST',
+        headers: {'Content-Type':'application/x-www-form-urlencoded'},
+        body: 'password=' + encodeURIComponent(pw)
+      }).then(function(r){ return r.json(); }).then(function(d){
+        if (d.token) {
+          window.location.href = '/#__token=' + d.token;
+        } else {
+          document.getElementById('err').className = 'err show';
+        }
+      }).catch(function(){ document.getElementById('err').className = 'err show'; });
+    });
+  })();
+  </script>
 </div>
 </body>
 </html>`;
 
-// ── Login POST — validates password, redirects with token in URL hash ──────────
-app.post("/__auth", express.urlencoded({ extended: false }), (req: Request, res: Response) => {
+// Login POST — returns JSON {token} so the login page JS can set window.location.hash.
+// Using JSON avoids the S3 CDN 405 that a native form POST to /__auth triggers
+// in the published pplx.app sandbox (non-/port/5000 paths are CDN-only).
+app.post("/__auth", express.urlencoded({ extended: false }), express.json(), (req: Request, res: Response) => {
   if (req.body?.password === PASSWORD) {
-    // Pass token via URL hash so the React SPA can read it from window.location.hash
-    // and store it in memory (no localStorage/cookie needed)
-    res.redirect(`/#__token=${VALID_TOKEN}`);
+    res.json({ token: VALID_TOKEN });
   } else {
-    res.status(401).send(LOGIN_HTML.replace("{{ERR_CLASS}}", "show"));
+    res.status(401).json({ error: "Wrong password" });
   }
 });
 
