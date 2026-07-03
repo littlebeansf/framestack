@@ -14,9 +14,9 @@
  *   DELETE /api/links/:id
  */
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { apiRequest, API_BASE, getAuthToken } from "@/lib/queryClient";
+import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import type { LinkList as LinkListType, Link } from "@shared/schema";
 import { Input } from "@/components/ui/input";
@@ -28,6 +28,9 @@ import {
   ExternalLink,
   FolderOpen,
   ChevronRight,
+  ArrowDownAZ,
+  ArrowUpAZ,
+  Clock,
 } from "lucide-react";
 
 const ACCENT = "hsl(20 90% 60%)";
@@ -121,6 +124,21 @@ function LinkRow({ link, onDelete }: { link: Link; onDelete: (id: number) => voi
 
 // ── Right panel: links for a selected list ────────────────────────────────────
 
+type SortDir = "asc" | "desc" | "recent";
+
+function SortToggle({ sort, onToggle }: { sort: SortDir; onToggle: () => void }) {
+  return (
+    <button
+      onClick={onToggle}
+      title={sort === "recent" ? "Sort A→Z" : sort === "asc" ? "Sort Z→A" : "Sort by recent"}
+      className="w-7 h-7 rounded-lg flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-secondary transition-all"
+      data-testid="button-sort-links"
+    >
+      {sort === "recent" ? <Clock size={12} /> : sort === "asc" ? <ArrowDownAZ size={12} /> : <ArrowUpAZ size={12} />}
+    </button>
+  );
+}
+
 function LinksPanel({ list }: { list: LinkListType }) {
   const qc = useQueryClient();
   const { toast } = useToast();
@@ -132,7 +150,10 @@ function LinksPanel({ list }: { list: LinkListType }) {
 
   const { data: links = [], isLoading } = useQuery<Link[]>({
     queryKey: linksKey,
-    queryFn: () => fetch(`${API_BASE}/api/link-lists/${list.id}/links`, { headers: getAuthToken() ? { "x-auth-token": getAuthToken() } : {} }).then(r => r.json()),
+    queryFn: async () => {
+      const res = await apiRequest("GET", `/api/link-lists/${list.id}/links`, undefined);
+      return res.json();
+    },
   });
 
   const addMutation = useMutation({
@@ -179,6 +200,9 @@ function LinksPanel({ list }: { list: LinkListType }) {
             {links.length}
           </span>
         )}
+        <div className="ml-auto">
+          <SortToggle sort={linkSort} onToggle={() => setLinkSort(s => s === "recent" ? "asc" : s === "asc" ? "desc" : "recent")} />
+        </div>
       </div>
 
       {/* Add link form */}
@@ -248,13 +272,19 @@ function LinksPanel({ list }: { list: LinkListType }) {
           </div>
         )}
 
-        {!isLoading && links.map(link => (
-          <LinkRow
-            key={link.id}
-            link={link}
-            onDelete={id => deleteMutation.mutate(id)}
-          />
-        ))}
+        {!isLoading && [...links]
+          .sort((a, b) => {
+            if (linkSort === "asc") return a.title.localeCompare(b.title);
+            if (linkSort === "desc") return b.title.localeCompare(a.title);
+            return 0; // "recent" — keep insertion order (newest first from server)
+          })
+          .map(link => (
+            <LinkRow
+              key={link.id}
+              link={link}
+              onDelete={id => deleteMutation.mutate(id)}
+            />
+          ))}
       </div>
     </div>
   );
@@ -273,10 +303,22 @@ export default function LinkList() {
 
   const listsKey = ["/api/link-lists"];
 
-  const { data: lists = [], isLoading: listsLoading } = useQuery<LinkListType[]>({
+  const [listSort, setListSort] = useState<SortDir>("recent");
+
+  const { data: listsRaw = [], isLoading: listsLoading } = useQuery<LinkListType[]>({
     queryKey: listsKey,
-    queryFn: () => fetch(`${API_BASE}/api/link-lists`, { headers: getAuthToken() ? { "x-auth-token": getAuthToken() } : {} }).then(r => r.json()),
+    queryFn: async () => {
+      const res = await apiRequest("GET", "/api/link-lists", undefined);
+      return res.json();
+    },
   });
+
+  const lists = useMemo(() => {
+    const copy = [...listsRaw];
+    if (listSort === "asc") copy.sort((a, b) => a.name.localeCompare(b.name));
+    if (listSort === "desc") copy.sort((a, b) => b.name.localeCompare(a.name));
+    return copy;
+  }, [listsRaw, listSort]);
 
   // Auto-select first list
   const selectedList = lists.find(l => l.id === selectedId) ?? lists[0] ?? null;
@@ -315,7 +357,10 @@ export default function LinkList() {
       <div className="w-56 flex-shrink-0 flex flex-col gap-3">
         {/* Create list form */}
         <div className="flex flex-col gap-2 p-3 rounded-xl border border-border bg-secondary/30">
-          <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">New list</p>
+          <div className="flex items-center justify-between">
+            <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">New list</p>
+            <SortToggle sort={listSort} onToggle={() => setListSort(s => s === "recent" ? "asc" : s === "asc" ? "desc" : "recent")} />
+          </div>
           <div className="flex gap-1.5">
             <Input
               data-testid="input-list-emoji"
