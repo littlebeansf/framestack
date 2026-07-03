@@ -228,6 +228,74 @@ function seedDefaultCollections() {
 }
 seedDefaultCollections();
 
+// ─── Migration: fix items misplaced in broad-group collections ─────────────────────
+// Old scheme used mediaGroup="anime" for anime/movie/series and
+// mediaGroup="book" for manga/book. This migration moves any collection_items
+// where item.media_type doesn't match the collection.media_group into the
+// correct per-type default collection for the same owner + status.
+function migrateCollectionItems() {
+  // Find all collection_items where the item's media_type != collection's media_group
+  const misplaced = getDb().prepare(`
+    SELECT 
+      ci.id          AS ci_id,
+      ci.item_id,
+      ci.status,
+      i.media_type,
+      c.default_status,
+      c.owner
+    FROM collection_items ci
+    JOIN items i ON i.id = ci.item_id
+    JOIN collections c ON c.id = ci.collection_id
+    WHERE c.is_default = 1
+      AND c.media_group != i.media_type
+  `).all() as Array<{
+    ci_id: number;
+    item_id: number;
+    status: string | null;
+    media_type: string;
+    default_status: string | null;
+    owner: string;
+  }>;
+
+  if (misplaced.length === 0) return;
+  console.log(`[migration] Moving ${misplaced.length} misplaced collection item(s) to correct per-type collections`);
+
+  for (const row of misplaced) {
+    // Find the correct default collection: same owner, same defaultStatus, correct mediaGroup
+    const targetStatus = row.status ?? row.default_status ?? "watching";
+    const target = getDb().prepare(`
+      SELECT id FROM collections
+      WHERE is_default = 1
+        AND owner = ?
+        AND media_group = ?
+        AND default_status = ?
+      LIMIT 1
+    `).get(row.owner, row.media_type, targetStatus) as { id: number } | undefined;
+
+    if (!target) {
+      // Try any collection matching owner + mediaGroup
+      const fallback = getDb().prepare(`
+        SELECT id FROM collections
+        WHERE is_default = 1 AND owner = ? AND media_group = ?
+        LIMIT 1
+      `).get(row.owner, row.media_type) as { id: number } | undefined;
+      if (!fallback) { console.warn(`[migration] No target collection for owner=${row.owner} mediaType=${row.media_type}`); continue; }
+
+      // Move: delete from old, upsert into new
+      getDb().prepare(`DELETE FROM collection_items WHERE id = ?`).run(row.ci_id);
+      const exists = getDb().prepare(`SELECT id FROM collection_items WHERE collection_id = ? AND item_id = ?`).get(fallback.id, row.item_id);
+      if (!exists) getDb().prepare(`INSERT INTO collection_items (collection_id, item_id, status) VALUES (?, ?, ?)`).run(fallback.id, row.item_id, row.status);
+      continue;
+    }
+
+    getDb().prepare(`DELETE FROM collection_items WHERE id = ?`).run(row.ci_id);
+    const exists = getDb().prepare(`SELECT id FROM collection_items WHERE collection_id = ? AND item_id = ?`).get(target.id, row.item_id);
+    if (!exists) getDb().prepare(`INSERT INTO collection_items (collection_id, item_id, status) VALUES (?, ?, ?)`).run(target.id, row.item_id, row.status);
+  }
+  console.log(`[migration] Done.`);
+}
+migrateCollectionItems();
+
 // ─── Interface ───────────────────────────────────────────────────────────────
 
 

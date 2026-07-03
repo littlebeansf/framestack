@@ -234,9 +234,9 @@ export default function CollectionDetailPage() {
             {collection?.description && (
               <p className="text-sm text-muted-foreground mt-1">{collection.description}</p>
             )}
-            {collection?.isDefault && (
-              <span className="inline-block mt-1.5 text-[10px] px-2 py-0.5 rounded-full bg-primary/10 text-primary border border-primary/20 font-medium">
-                {collection.mediaGroup === "anime" ? "Anime · Movie · Series" : "Manga · Book"}
+            {collection?.isDefault && collection.mediaGroup && (
+              <span className="inline-block mt-1.5 text-[10px] px-2 py-0.5 rounded-full bg-primary/10 text-primary border border-primary/20 font-medium capitalize">
+                {collection.mediaGroup}
               </span>
             )}
           </div>
