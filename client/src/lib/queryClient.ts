@@ -7,47 +7,71 @@ const API_BASE = "__PORT_5000__".startsWith("__") ? "" : "__PORT_5000__";
 
 export { API_BASE };
 
-// ── Auth token ─────────────────────────────────────────────────────────────────
-// After login, the server redirects to /#__token=<token>.
-// We read it from the hash once, store in memory, and strip it from the URL.
-// This survives the S3→Express split in the published sandbox (no cookie needed).
+// ── Auth token ────────────────────────────────────────────────────────────────
+// The token is stored in a module-level variable (_authToken) and mirrored to
+// sessionStorage when available. On startup, initToken() restores it from
+// sessionStorage (or from the URL hash if the login page just redirected here).
+//
+// The login screen (in App.tsx) calls setToken() after a successful POST to
+// /__auth. All API fetch calls read the token via authHeaders().
+// ─────────────────────────────────────────────────────────────────────────────
+
 let _authToken: string = "";
 
-// Safe sessionStorage wrapper — falls back to a module-level cache when
-// the browser's Tracking Prevention blocks storage access (e.g. Safari ITP).
+// In-memory mirror — used as fallback when sessionStorage is blocked
+// (Safari Tracking Prevention, certain browser privacy modes).
 const _ssCache: Record<string, string> = {};
+
 function ssGet(key: string): string | null {
   try { return sessionStorage.getItem(key); } catch { return _ssCache[key] ?? null; }
 }
 function ssSet(key: string, val: string): void {
-  try { sessionStorage.setItem(key, val); } catch { /* blocked */ }
-  _ssCache[key] = val; // always keep in-memory copy
+  _ssCache[key] = val; // always keep in memory
+  try { sessionStorage.setItem(key, val); } catch { /* blocked — in-memory copy is enough */ }
+}
+function ssDel(key: string): void {
+  delete _ssCache[key];
+  try { sessionStorage.removeItem(key); } catch {}
 }
 
+// Called once on module load. Restores token from storage or URL hash.
 function initToken() {
-  // 1. Check sessionStorage (with in-memory fallback) — survives page refresh on published site
+  // 1. Restore from sessionStorage / in-memory cache (survives page refresh)
   const stored = ssGet("fs_token");
   if (stored) { _authToken = stored; return; }
 
-  // 2. Check URL hash — set by the login page JS after a successful auth
-  const hash = window.location.hash; // e.g. "#__token=abc123" or "#/jack#__token=abc123"
+  // 2. Restore from URL hash — set by the React login component after auth
+  //    e.g. window.location.hash === "#__token=d3c31fdf..."
+  const hash = window.location.hash;
   const match = hash.match(/__token=([a-f0-9]+)/);
   if (match) {
     _authToken = match[1];
-    ssSet("fs_token", _authToken); // persist for refreshes
-    // Strip the token from the URL hash cleanly
-    const cleanHash = hash.replace(/[#&]?__token=[a-f0-9]+/, "").replace(/^#$/, "") || "#/";
-    window.history.replaceState(null, "", cleanHash || "/");
+    ssSet("fs_token", _authToken);
+    // Strip the token from the URL so it doesn't appear in the address bar
+    const clean = hash.replace(/[#&]?__token=[a-f0-9]+/, "").replace(/^#$/, "") || "#/";
+    window.history.replaceState(null, "", clean || "/");
   }
 }
 
-// Run once on module load
-if (typeof window !== "undefined") {
-  initToken();
+if (typeof window !== "undefined") initToken();
+
+/** Read the current auth token (empty string = not logged in). */
+export function getAuthToken(): string { return _authToken; }
+
+/** Store a freshly obtained token. Called by the React login component. */
+export function setToken(token: string): void {
+  _authToken = token;
+  ssSet("fs_token", token);
 }
 
-export function getAuthToken() { return _authToken; }
-export function setAuthToken(t: string) { _authToken = t; }
+/** Clear the token (logout). */
+export function clearToken(): void {
+  _authToken = "";
+  ssDel("fs_token");
+}
+
+/** True if the user has a token (i.e., is authenticated). */
+export function isAuthenticated(): boolean { return _authToken.length > 0; }
 
 // ── Error helper ───────────────────────────────────────────────────────────────
 async function throwIfResNotOk(res: Response) {
