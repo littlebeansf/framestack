@@ -638,8 +638,9 @@ export default function OwnerCollectionsPage({ owner }: { owner: string }) {
   const { data: collections, isLoading } = useQuery<Collection[]>({
     queryKey: ["/api/collections", owner],
     queryFn: async () => {
-      const base = API_BASE;
-      const res = await fetch(`${base}/api/collections?owner=${owner}`);
+      const res = await fetch(`${API_BASE}/api/collections?owner=${owner}`, {
+        headers: getAuthToken() ? { "x-auth-token": getAuthToken() } : {},
+      });
       return res.json();
     },
   });
@@ -651,8 +652,9 @@ export default function OwnerCollectionsPage({ owner }: { owner: string }) {
     queries: cols.map(col => ({
       queryKey: ["/api/collections", col.id, "items"],
       queryFn: async () => {
-        const base = API_BASE;
-        const res = await fetch(`${base}/api/collections/${col.id}/items`);
+        const res = await fetch(`${API_BASE}/api/collections/${col.id}/items`, {
+          headers: getAuthToken() ? { "x-auth-token": getAuthToken() } : {},
+        });
         return res.json();
       },
       staleTime: 60_000,

@@ -13,25 +13,28 @@ export { API_BASE };
 // This survives the S3→Express split in the published sandbox (no cookie needed).
 let _authToken: string = "";
 
-function initToken() {
-  // 1. Check sessionStorage first — survives page refresh on published site
-  //    (The "no localStorage" rule was for the preview iframe only; the published
-  //     pplx.app sandbox runs outside the iframe so sessionStorage is available.)
-  try {
-    const stored = sessionStorage.getItem("fs_token");
-    if (stored) {
-      _authToken = stored;
-      return;
-    }
-  } catch { /* sessionStorage may be unavailable in some envs — ignore */ }
+// Safe sessionStorage wrapper — falls back to a module-level cache when
+// the browser's Tracking Prevention blocks storage access (e.g. Safari ITP).
+const _ssCache: Record<string, string> = {};
+function ssGet(key: string): string | null {
+  try { return sessionStorage.getItem(key); } catch { return _ssCache[key] ?? null; }
+}
+function ssSet(key: string, val: string): void {
+  try { sessionStorage.setItem(key, val); } catch { /* blocked */ }
+  _ssCache[key] = val; // always keep in-memory copy
+}
 
-  // 2. Check URL hash — set by the server after a successful login redirect
+function initToken() {
+  // 1. Check sessionStorage (with in-memory fallback) — survives page refresh on published site
+  const stored = ssGet("fs_token");
+  if (stored) { _authToken = stored; return; }
+
+  // 2. Check URL hash — set by the login page JS after a successful auth
   const hash = window.location.hash; // e.g. "#__token=abc123" or "#/jack#__token=abc123"
   const match = hash.match(/__token=([a-f0-9]+)/);
   if (match) {
     _authToken = match[1];
-    // Persist so the token survives page refreshes
-    try { sessionStorage.setItem("fs_token", _authToken); } catch { /* ignore */ }
+    ssSet("fs_token", _authToken); // persist for refreshes
     // Strip the token from the URL hash cleanly
     const cleanHash = hash.replace(/[#&]?__token=[a-f0-9]+/, "").replace(/^#$/, "") || "#/";
     window.history.replaceState(null, "", cleanHash || "/");
