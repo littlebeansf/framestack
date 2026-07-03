@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient, useQueries } from "@tanstack/react-query";
-import { apiRequest, API_BASE } from "@/lib/queryClient";
+import { apiRequest, API_BASE, getAuthToken } from "@/lib/queryClient";
 import type { Collection, Item } from "@shared/schema";
 import { STATUS_LABELS, STATUS_COLORS, getStatusesForMediaType, getMediaGroup, getExactMediaGroup } from "@shared/schema";
 import { useLocation } from "wouter";
@@ -658,26 +658,24 @@ export default function OwnerCollectionsPage({ owner }: { owner: string }) {
   const { data: collections, isLoading } = useQuery<Collection[]>({
     queryKey: ["/api/collections", owner],
     queryFn: async () => {
-      const res = await fetch(`${API_BASE}/api/collections?owner=${owner}`, {
-        headers: getAuthToken() ? { "x-auth-token": getAuthToken() } : {},
-      });
+      const res = await apiRequest("GET", `/api/collections?owner=${owner}`, undefined);
       return res.json();
     },
   });
 
   const cols = collections || [];
 
-  // Prefetch items for ALL collections so CoverMosaic always has data
+  // Prefetch items for ALL collections so CoverStrip always has data.
+  // enabled: collections != null ensures we don't fire with an empty list on first render.
   const itemQueries = useQueries({
     queries: cols.map(col => ({
       queryKey: ["/api/collections", col.id, "items"],
       queryFn: async () => {
-        const res = await fetch(`${API_BASE}/api/collections/${col.id}/items`, {
-          headers: getAuthToken() ? { "x-auth-token": getAuthToken() } : {},
-        });
+        const res = await apiRequest("GET", `/api/collections/${col.id}/items`, undefined);
         return res.json();
       },
       staleTime: 60_000,
+      enabled: !!collections,
     })),
   });
 
