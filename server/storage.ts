@@ -1,6 +1,6 @@
 import { eq, and, desc } from "drizzle-orm";
 import {
-  users, items, collections, collectionItems, profiles, links, linkLists, secretMessages, quotes,
+  users, items, collections, collectionItems, profiles, links, linkLists, secretMessages, quotes, restaurants,
   type User, type InsertUser,
   type Item, type InsertItem,
   type Collection, type InsertCollection,
@@ -10,6 +10,7 @@ import {
   type LinkList, type InsertLinkList,
   type SecretMessage, type InsertSecretMessage,
   type Quote, type InsertQuote,
+  type Restaurant, type InsertRestaurant,
   type ItemWithStatus,
   OWNERS, DEFAULT_COLLECTIONS,
 } from "@shared/schema";
@@ -140,6 +141,22 @@ try { sqlite.exec(`UPDATE profiles SET avatar_emoji = '\ud83c\udfe0' WHERE owner
 try { sqlite.exec(`ALTER TABLE links ADD COLUMN list_id INTEGER NOT NULL DEFAULT 0`); } catch {}
 try { sqlite.exec(`ALTER TABLE link_lists ADD COLUMN emoji TEXT`); } catch {}
 try { sqlite.exec(`ALTER TABLE links ADD COLUMN icon TEXT`); } catch {}
+// Migrate restaurants table
+try { sqlite.exec(`CREATE TABLE IF NOT EXISTS restaurants (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  name TEXT NOT NULL,
+  address TEXT,
+  lat REAL,
+  lng REAL,
+  status TEXT NOT NULL DEFAULT 'want_to_go',
+  cuisine TEXT,
+  emoji TEXT,
+  rating REAL,
+  notes TEXT,
+  added_by TEXT,
+  visited_at INTEGER,
+  created_at INTEGER NOT NULL DEFAULT 0
+)`); } catch {}
 
 // Seed default profiles
 function seedProfiles() {
@@ -356,6 +373,13 @@ export interface IStorage {
   setQuoteFeatured(id: number, featured: boolean): Quote | null;
   reorderFeatured(owner: string, orderedIds: number[]): void;
   deleteQuote(id: number): void;
+
+  // Restaurants
+  getAllRestaurants(): Restaurant[];
+  getRestaurantById(id: number): Restaurant | undefined;
+  createRestaurant(data: InsertRestaurant): Restaurant;
+  updateRestaurant(id: number, data: Partial<InsertRestaurant>): Restaurant | undefined;
+  deleteRestaurant(id: number): void;
 
   // Secret Messages
   getMessagesFor(to: string): SecretMessage[];          // all messages for recipient
@@ -578,6 +602,23 @@ export class Storage implements IStorage {
   }
   deleteQuote(id: number) {
     db.delete(quotes).where(eq(quotes.id, id)).run();
+  }
+
+  // ── Restaurants ──────────────────────────────────────────────────
+  getAllRestaurants() {
+    return db.select().from(restaurants).orderBy(desc(restaurants.createdAt)).all();
+  }
+  getRestaurantById(id: number) {
+    return db.select().from(restaurants).where(eq(restaurants.id, id)).get();
+  }
+  createRestaurant(data: InsertRestaurant) {
+    return db.insert(restaurants).values({ ...data, createdAt: Date.now() }).returning().get();
+  }
+  updateRestaurant(id: number, data: Partial<InsertRestaurant>) {
+    return db.update(restaurants).set(data).where(eq(restaurants.id, id)).returning().get();
+  }
+  deleteRestaurant(id: number) {
+    db.delete(restaurants).where(eq(restaurants.id, id)).run();
   }
 
   // ── Secret Messages ───────────────────────────────────────────────────────

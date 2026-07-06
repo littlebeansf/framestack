@@ -199,6 +199,31 @@ export const insertQuoteSchema = createInsertSchema(quotes).omit({ id: true });
 export type InsertQuote = z.infer<typeof insertQuoteSchema>;
 export type Quote = typeof quotes.$inferSelect;
 
+// ─── Restaurants (Together shared tracker) ──────────────────────────────────
+
+export const RESTAURANT_STATUSES = ["want_to_go", "been"] as const;
+export type RestaurantStatus = (typeof RESTAURANT_STATUSES)[number];
+
+export const restaurants = sqliteTable("restaurants", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  name: text("name").notNull(),
+  address: text("address"),
+  lat: real("lat"),
+  lng: real("lng"),
+  status: text("status").notNull().default("want_to_go"), // "want_to_go" | "been"
+  cuisine: text("cuisine"),        // free-text e.g. "Italian" "Sushi" "Thai"
+  emoji: text("emoji"),            // decorative e.g. "🍕" "🍣"
+  rating: real("rating"),          // 1–5, null if not yet rated
+  notes: text("notes"),
+  addedBy: text("added_by"),       // "jack" | "sally" | null
+  visitedAt: integer("visited_at"), // unix ms — set when marking as "been"
+  createdAt: integer("created_at").notNull().default(0),
+});
+
+export const insertRestaurantSchema = createInsertSchema(restaurants).omit({ id: true });
+export type InsertRestaurant = z.infer<typeof insertRestaurantSchema>;
+export type Restaurant = typeof restaurants.$inferSelect;
+
 // ─── Secret Messages (jack ↔ sally) ──────────────────────────────────────────
 // from: "jack" | "sally"   — who wrote it
 // to:   "jack" | "sally"   — who receives it

@@ -362,6 +362,69 @@ export async function registerRoutes(httpServer: Server, app: Express) {
     }
   });
 
+  // ─── Restaurants ──────────────────────────────────────────────────────────────────────
+
+  app.get("/api/restaurants", (_req, res) => {
+    try { res.json(storage.getAllRestaurants()); }
+    catch (err: any) { res.status(500).json({ error: err.message }); }
+  });
+
+  app.post("/api/restaurants", (req, res) => {
+    try {
+      const { name, address, lat, lng, status, cuisine, emoji, rating, notes, addedBy } = req.body;
+      if (!name?.trim()) return res.status(400).json({ error: "name required" });
+      res.status(201).json(storage.createRestaurant({
+        name: name.trim(),
+        address: address?.trim() ?? null,
+        lat: lat ?? null,
+        lng: lng ?? null,
+        status: status ?? "want_to_go",
+        cuisine: cuisine?.trim() ?? null,
+        emoji: emoji?.trim() ?? null,
+        rating: rating ?? null,
+        notes: notes?.trim() ?? null,
+        addedBy: addedBy ?? null,
+        visitedAt: status === "been" ? Date.now() : null,
+        createdAt: Date.now(),
+      }));
+    } catch (err: any) { res.status(500).json({ error: err.message }); }
+  });
+
+  app.patch("/api/restaurants/:id", (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const { name, address, lat, lng, status, cuisine, emoji, rating, notes, addedBy } = req.body;
+      const existing = storage.getRestaurantById(id);
+      if (!existing) return res.status(404).json({ error: "Not found" });
+      const visitedAt = status === "been" && existing.status !== "been"
+        ? Date.now()
+        : status === "want_to_go" ? null : existing.visitedAt;
+      const updated = storage.updateRestaurant(id, {
+        ...(name !== undefined && { name: name.trim() }),
+        ...(address !== undefined && { address: address?.trim() ?? null }),
+        ...(lat !== undefined && { lat }),
+        ...(lng !== undefined && { lng }),
+        ...(status !== undefined && { status }),
+        ...(cuisine !== undefined && { cuisine: cuisine?.trim() ?? null }),
+        ...(emoji !== undefined && { emoji: emoji?.trim() ?? null }),
+        ...(rating !== undefined && { rating }),
+        ...(notes !== undefined && { notes: notes?.trim() ?? null }),
+        ...(addedBy !== undefined && { addedBy }),
+        visitedAt,
+      });
+      if (!updated) return res.status(404).json({ error: "Not found" });
+      res.json(updated);
+    } catch (err: any) { res.status(500).json({ error: err.message }); }
+  });
+
+  app.delete("/api/restaurants/:id", (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      storage.deleteRestaurant(id);
+      res.json({ ok: true });
+    } catch (err: any) { res.status(500).json({ error: err.message }); }
+  });
+
   // ─── Export / Restore (full DB backup) ──────────────────────────────────────
   // GET  /api/export  → download entire DB as JSON (items, collections, collection-items, profiles, link-lists, links)
   // POST /api/restore → restore from that same JSON shape (additive — does not wipe existing data first)
