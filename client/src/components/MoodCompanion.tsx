@@ -28,7 +28,8 @@ import type { DailyMood } from "@shared/schema";
 
 export type MoodKey =
   | "happy" | "sad" | "hyped" | "cozy" | "tired"
-  | "loved" | "chaotic" | "numb";
+  | "loved" | "chaotic" | "numb"
+  | "horny" | "thirsty" | "feral" | "down bad" | "brainrot" | "unhinged" | "wet" | "touch starved";
 
 interface MoodDef {
   key: MoodKey;

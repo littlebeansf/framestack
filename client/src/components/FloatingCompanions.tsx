@@ -22,7 +22,8 @@ import type { DailyMood } from "@shared/schema";
 
 export type MoodKey =
   | "happy" | "sad" | "hyped" | "cozy" | "tired"
-  | "loved" | "chaotic" | "numb";
+  | "loved" | "chaotic" | "numb"
+  | "horny" | "thirsty" | "feral" | "down bad" | "brainrot" | "unhinged" | "wet" | "touch starved";
 
 interface MoodDef {
   key: MoodKey;
@@ -145,6 +146,134 @@ const MOODS: MoodDef[] = [
       "Did you see that?! What even IS life right now.",
       "I have THREE things to tell you. None make sense.",
       "WAIT— okay never mind. Or actually wait—",
+    ],
+  },
+  {
+    key: "horny",
+    emoji: "🔥", label: "Horny",
+    color: "#ff4d6d",
+    particles: "🌶️",
+    phrase: [
+      "I am NOT okay right now and it's everyone's fault.",
+      "My brain went somewhere it should not have gone.",
+      "I need to go touch grass. Or something else.",
+    ],
+    toOther: [
+      "Hey so… you ever just… nevermind.",
+      "Stop existing like that. It's rude.",
+      "I'm fine. Everything's fine. You're just very close.",
+    ],
+  },
+  {
+    key: "thirsty",
+    emoji: "💦", label: "Thirsty",
+    color: "#38bdf8",
+    particles: "💦",
+    phrase: [
+      "It's giving everything and I mean EVERYTHING.",
+      "Someone send help. Or don't. I'm good.",
+      "My standards lowered and my needs got louder.",
+    ],
+    toOther: [
+      "Why do you have to exist like THAT.",
+      "You're doing this on purpose and we both know it.",
+      "I'm hydrated. Not in the way I want to be.",
+    ],
+  },
+  {
+    key: "feral",
+    emoji: "🐺", label: "Feral",
+    color: "#a855f7",
+    particles: "😈",
+    phrase: [
+      "Lost the plot. Found something better.",
+      "Civilised? Never heard of her.",
+      "Operating purely on instinct rn. Pray for me.",
+    ],
+    toOther: [
+      "You wouldn't survive five minutes in my brain right now.",
+      "I am feral and it's your fault for being attractive.",
+      "Don't make eye contact. I'm not responsible for what happens.",
+    ],
+  },
+  {
+    key: "down bad",
+    emoji: "😩", label: "Down Bad",
+    color: "#f43f5e",
+    particles: "😭",
+    phrase: [
+      "I am at rock bottom and it's kind of freeing.",
+      "Down bad doesn't cover it. Down catastrophic.",
+      "Send thoughts and prayers. And also someone.",
+    ],
+    toOther: [
+      "It's you. It's always been you. I hate this.",
+      "I'm spiralling and you're the reason. Thanks.",
+      "This is your fault and I need you to fix it immediately.",
+    ],
+  },
+  {
+    key: "brainrot",
+    emoji: "🧠", label: "Brainrot",
+    color: "#ec4899",
+    particles: "💀",
+    phrase: [
+      "My brain is 90% unhinged thoughts and 10% regret.",
+      "I have consumed too much content and now I am the content.",
+      "The rot has set in. I am at peace with this.",
+    ],
+    toOther: [
+      "I've been thinking about you in ways that aren't legal in some countries.",
+      "I need a lobotomy and also your number.",
+      "My brain broke and you were the last thing it saw.",
+    ],
+  },
+  {
+    key: "unhinged",
+    emoji: "🌪️", label: "Unhinged",
+    color: "#d946ef",
+    particles: "⚡",
+    phrase: [
+      "Completely off the rails. Choo choo.",
+      "I said what I said and I'll say it again louder.",
+      "Normal? I am so far past normal it's a dot.",
+    ],
+    toOther: [
+      "I am thinking THOUGHTS and they are ALL about you.",
+      "You look too good right now and I cannot be held responsible.",
+      "Someone needs to stop me. Not you though. Don't you dare.",
+    ],
+  },
+  {
+    key: "wet",
+    emoji: "🌊", label: "Wet",
+    color: "#06b6d4",
+    particles: "💧",
+    phrase: [
+      "Completely soaked. Metaphorically. Mostly.",
+      "It started as a vibe and now it's a whole situation.",
+      "I am dripping with something and it's called want.",
+    ],
+    toOther: [
+      "You did this. Own it.",
+      "My composure left the chat. You were the reason.",
+      "I was doing fine until you showed up like THAT.",
+    ],
+  },
+  {
+    key: "touch starved",
+    emoji: "🫂", label: "Touch Starved",
+    color: "#fb7185",
+    particles: "💞",
+    phrase: [
+      "I just want someone's hand. Or everything. Either.",
+      "Skin hunger is real and it's eating me alive.",
+      "I need to be held and I'm not joking at all.",
+    ],
+    toOther: [
+      "Come here. Just. Come here.",
+      "I'm not asking. I'm manifesting. You're coming over.",
+      "If you touch my shoulder right now I will actually implode.",
     ],
   },
   {
@@ -340,7 +469,15 @@ function JackCreature({ mood, animClass, onClick }: {
     tired:   <path d="M-5,10 L5,10"      stroke={c} strokeWidth="1.5" strokeLinecap="round" fill="none" />,
     loved:   <path d="M-5,8 Q0,14 5,8"  stroke={c} strokeWidth="2"   strokeLinecap="round" fill="none" />,
     chaotic: <path d="M-7,9 L-4,12 L-1,8 L2,12 L5,9 L7,11" stroke={c} strokeWidth="1.8" strokeLinecap="round" fill="none" />,
-    numb:    <path d="M-5,10 L5,10"     stroke={c} strokeWidth="1.5" strokeLinecap="round" fill="none" />,
+    numb:           <path d="M-5,10 L5,10"     stroke={c} strokeWidth="1.5" strokeLinecap="round" fill="none" />,
+    horny:          <path d="M-5,8 Q0,15 5,8"  stroke={c} strokeWidth="2.2" strokeLinecap="round" fill="none" />,
+    thirsty:        <path d="M-7,7 Q0,16 7,7"   stroke={c} strokeWidth="2.5" strokeLinecap="round" fill="none" />,
+    feral:          <path d="M-7,9 L-4,12 L-1,8 L2,12 L5,9 L7,11" stroke={c} strokeWidth="2" strokeLinecap="round" fill="none" />,
+    "down bad":     <path d="M-6,12 Q0,8 6,12"  stroke={c} strokeWidth="1.8" strokeLinecap="round" fill="none" />,
+    brainrot:       <path d="M-5,8 Q-2,14 0,10 Q2,14 5,8" stroke={c} strokeWidth="1.8" strokeLinecap="round" fill="none" />,
+    unhinged:       <path d="M-7,7 Q0,18 7,7"   stroke={c} strokeWidth="2.8" strokeLinecap="round" fill="none" />,
+    wet:            <path d="M-4,9 Q0,12 4,9"   stroke={c} strokeWidth="1.8" strokeLinecap="round" fill="none" />,
+    "touch starved":<path d="M-6,8 Q0,14 6,8"   stroke={c} strokeWidth="2" strokeLinecap="round" fill="none" />,
   };
 
   return (
@@ -445,11 +582,31 @@ function SallyCreature({ mood, animClass, onClick }: {
         <path d={`M${cx-3.5},-12.5 L${cx-1},-10`} stroke={c} strokeWidth="1.2" strokeLinecap="round" opacity="0.8" />
       </>
     );
-    if (m === "chaotic") return (
+    if (m === "chaotic" || m === "feral" || m === "unhinged") return (
       <>
         {base}
         <circle cx={cx+2.5} cy={-11} r="1.2" fill={c} opacity="0.8" />
         <circle cx={cx-2.5} cy={-11} r="0.8" fill={c} opacity="0.6" />
+      </>
+    );
+    if (m === "horny" || m === "touch starved") return (
+      <>
+        <g transform={`translate(${cx}, -8) scale(0.7)`}>
+          <path d="M0,2 C-4,-1 -5,-5 -2.5,-5 C-1,-5 0,-3.5 0,-3.5 C0,-3.5 1,-5 2.5,-5 C5,-5 4,-1 0,2Z" fill={c} />
+          <circle cx="-1.5" cy="-1.5" r="0.7" fill="white" opacity="0.7" />
+        </g>
+      </>
+    );
+    if (m === "thirsty" || m === "wet") return (
+      <>
+        {base}
+        <path d={`M${cx-4.5},-4 Q${cx},-6.5 ${cx+4.5},-4`} stroke={c} strokeWidth="1.2" strokeLinecap="round" fill="none" opacity="0.7" />
+      </>
+    );
+    if (m === "down bad" || m === "brainrot") return (
+      <>
+        {base}
+        <path d={`M${cx-3.5},-12.5 L${cx-1},-10`} stroke={c} strokeWidth="1.2" strokeLinecap="round" opacity="0.8" />
       </>
     );
     return <>{base}</>;
@@ -463,10 +620,18 @@ function SallyCreature({ mood, animClass, onClick }: {
     tired:   <path d="M-3,3 L3,3"        stroke={c} strokeWidth="1.4" strokeLinecap="round" fill="none" />,
     loved:   <path d="M-4,1 Q0,6 4,1"    stroke={c} strokeWidth="1.8" strokeLinecap="round" fill="none" />,
     chaotic: <path d="M-5,2 L-3,5 L0,2 L3,5 L5,2" stroke={c} strokeWidth="1.6" strokeLinecap="round" fill="none" />,
-    numb:    <path d="M-3,3 L3,3"        stroke={c} strokeWidth="1.4" strokeLinecap="round" fill="none" />,
+    numb:           <path d="M-3,3 L3,3"        stroke={c} strokeWidth="1.4" strokeLinecap="round" fill="none" />,
+    horny:          <path d="M-4,1 Q0,7 4,1"    stroke={c} strokeWidth="2" strokeLinecap="round" fill="none" />,
+    thirsty:        <path d="M-6,1 Q0,8 6,1"    stroke={c} strokeWidth="2.2" strokeLinecap="round" fill="none" />,
+    feral:          <path d="M-5,2 L-3,5 L0,2 L3,5 L5,2" stroke={c} strokeWidth="1.8" strokeLinecap="round" fill="none" />,
+    "down bad":     <path d="M-4,4 Q0,1 4,4"    stroke={c} strokeWidth="1.5" strokeLinecap="round" fill="none" />,
+    brainrot:       <path d="M-4,1 Q-2,6 0,3 Q2,6 4,1" stroke={c} strokeWidth="1.6" strokeLinecap="round" fill="none" />,
+    unhinged:       <path d="M-6,1 Q0,9 6,1"    stroke={c} strokeWidth="2.5" strokeLinecap="round" fill="none" />,
+    wet:            <path d="M-3,2 Q0,5 3,2"    stroke={c} strokeWidth="1.5" strokeLinecap="round" fill="none" />,
+    "touch starved":<path d="M-5,1 Q0,6 5,1"    stroke={c} strokeWidth="1.8" strokeLinecap="round" fill="none" />,
   };
 
-  const showBlush = ["happy","loved","hyped","cozy"].includes(mood);
+  const showBlush = ["happy","loved","hyped","cozy","horny","thirsty","touch starved"].includes(mood);
 
   return (
     <svg
@@ -727,6 +892,14 @@ const CROSS_CHAT: Record<"jack" | "sally", Partial<Record<MoodKey, string[]>>> =
     loved:   ["You make this place feel real.", "Really glad it's you over there.", "💙 no further comment"],
     chaotic: ["OKAY WAIT I HAVE A THEORY— actually nvm— wait YES—", "How are you so calm when everything is ???", "I'm spinning. You're my anchor rn."],
     numb:    ["…", "I'm here though.", "Quiet is fine."],
+    horny:         ["Sal… I need you to stand a little further away.", "I'm haunting you but like in a sexy way.", "My ectoplasm is acting up and it's YOUR fault."],
+    thirsty:       ["I don't need water I need ATTENTION.", "You're giving me feelings I was not equipped for.", "I'm a ghost and somehow still down bad."],
+    feral:         ["SALLY I AM NOT OKAY PLEASE ACKNOWLEDGE ME.", "I have transcended reason. We're in the feral zone now.", "I'm haunting you and flirting simultaneously. Multitasking."],
+    "down bad":    ["I've been a ghost for years and somehow you still get to me.", "Down bad doesn't cover it. Down catastrophic.", "Send an exorcist. Or a hug. Or both."],
+    brainrot:      ["My skull is full of thoughts about you and also chaos.", "I have been rotting since you walked in.", "My brain broke. You were the last thing it buffered."],
+    unhinged:      ["SALLY I HAVE THOUGHTS AND THEY ARE ALL ABOUT YOU.", "I am spinning and you are the axis. That's canon now.", "I cannot be held responsible for whatever I say next."],
+    wet:           ["The rain is nothing. It's YOU.", "I was fine until approximately right now.", "You're soaking my vibe and I LOVE it."],
+    "touch starved": ["I'm a ghost. I literally cannot touch anything. I hate this.", "One (1) head pat. That's all. Please.", "I just want to hold your hand but I have no hands. Tragedy."],
   },
   sally: {
     happy:   ["Jack you look extra spooky-cute today 🌸", "I love days like this 🦊", "Can today just… last a little longer?"],
@@ -737,6 +910,14 @@ const CROSS_CHAT: Record<"jack" | "sally", Partial<Record<MoodKey, string[]>>> =
     loved:   ["You're my favourite haunting 💖", "I'm really really glad we're here.", "This corner is my whole world sometimes."],
     chaotic: ["THERE ARE TOO MANY THOUGHTS IN MY BRAIN—", "Pick a vibe. I can't. Too many.", "I went from cozy to chaos in 0.2 seconds help"],
     numb:    ["Still here~", "No pressure. Just existing.", "…💗"],
+    horny:         ["Jack I swear if you look at me like that again—", "I'm a fox. I have instincts. You're not helping.", "My tail is bushy for reasons I won't explain."],
+    thirsty:       ["I need something and it's not tea.", "You're being very distracting and I need you to continue.", "The audacity of you to exist like that near me."],
+    feral:         ["I have left my body and my body has made decisions.", "FOX MODE ACTIVATED. Rationality? Gone. Bye.", "I'm gnawing on my feelings and they taste like you."],
+    "down bad":    ["I wrote your name in my diary and then ate the page.", "I am at the bottom of the bad and it's shaped like you.", "This is embarrassing and I'm leaning into it."],
+    brainrot:      ["My brain is 80% you and 20% anxiety about that.", "I have consumed so much of your vibe I AM the vibe.", "Rotting. Happily. Because of you. Don't tell anyone."],
+    unhinged:      ["I have clocked out of sanity and clocked into THIS.", "Say one more thing and I will do something we'll both enjoy.", "I am unravelling at the speed of your voice."],
+    wet:           ["It's fine. I'm a fox. We like water. This is fine.", "Completely soaked. This is your doing. Own it.", "I'm melting and blaming you entirely."],
+    "touch starved": ["Come here. Don't ask. Just come here.", "I will vibrate out of existence if I'm not touched soon.", "My fur is WASTED if nobody pets it. This is a crisis."],
   },
 };
 
@@ -757,6 +938,14 @@ const SYNC_EFFECTS: Record<MoodKey, { particles: string[]; label: string; color:
   tired:   { particles: ["💤","😴","z"],  label: "zzz…",          color: "#94a3b8" },
   loved:   { particles: ["💖","💗","♡"],  label: "♡",            color: "#f472b6" },
   chaotic: { particles: ["🌀","❓","💫"], label: "??????",        color: "#c084fc" },
+  horny:        { particles: ["🔥","🌶️","💋"], label: "oh no…",       color: "#ff4d6d" },
+  thirsty:      { particles: ["💦","👀","😮"], label: "hydration",    color: "#38bdf8" },
+  feral:        { particles: ["🐺","😈","⚡"], label: "FERAL",         color: "#a855f7" },
+  "down bad":   { particles: ["😩","💀","😭"], label: "down BAD",      color: "#f43f5e" },
+  brainrot:     { particles: ["🧠","💀","🌸"], label: "rotting…",      color: "#ec4899" },
+  unhinged:     { particles: ["🌪️","😵","⚡"], label: "UNHINGED",      color: "#d946ef" },
+  wet:          { particles: ["💦","🌊","💧"], label: "soaked",        color: "#06b6d4" },
+  "touch starved": { particles: ["🫂","💞","🥺"], label: "hold me",    color: "#fb7185" },
   numb:    { particles: ["🩶","…","·"],   label: "…",             color: "#6b7280" },
 };
 
