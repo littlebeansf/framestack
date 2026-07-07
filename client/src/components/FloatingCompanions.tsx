@@ -277,31 +277,22 @@ function MoodPicker({ onSelect, onClose, currentMood }: {
         transform: "translateX(-50%)",
         background: "rgba(14,14,22,0.98)",
         backdropFilter: "blur(16px)",
-        width: 220,
+        width: 160,
       }}
     >
-      <div className="flex items-center justify-between mb-2">
-        <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Mood</p>
-        <button onClick={onClose} className="text-muted-foreground hover:text-foreground transition-colors">
-          <X size={12} />
-        </button>
-      </div>
-      <div className="grid grid-cols-4 gap-1.5">
+      <div className="grid grid-cols-4 gap-1">
         {MOODS.map(m => (
           <button
             key={m.key}
             onClick={() => { onSelect(m.key); onClose(); }}
             title={m.label}
-            className={cn(
-              "flex flex-col items-center gap-1 p-1.5 rounded-xl border-2 transition-all hover:scale-110 active:scale-95",
-            )}
+            className="flex items-center justify-center p-1.5 rounded-xl border-2 transition-all hover:scale-125 active:scale-90 text-xl leading-none"
             style={{
-              background: currentMood === m.key ? `${m.color}20` : "rgba(255,255,255,0.03)",
+              background: currentMood === m.key ? `${m.color}25` : "rgba(255,255,255,0.03)",
               borderColor: currentMood === m.key ? m.color : "transparent",
             }}
           >
-            <span className="text-lg leading-none">{m.emoji}</span>
-            <span className="text-[8px] font-bold text-muted-foreground uppercase tracking-wide leading-none">{m.label}</span>
+            {m.emoji}
           </button>
         ))}
       </div>
@@ -355,7 +346,7 @@ function JackCreature({ mood, animClass, onClick }: {
   return (
     <svg
       viewBox="-45 -55 90 110"
-      width={88} height={88}
+      width={110} height={110}
       onClick={onClick}
       className={cn("cursor-pointer select-none", animClass)}
       style={{ filter: `drop-shadow(0 0 10px ${c}88)`, overflow: "visible" }}
@@ -480,7 +471,7 @@ function SallyCreature({ mood, animClass, onClick }: {
   return (
     <svg
       viewBox="-42 -52 84 100"
-      width={88} height={88}
+      width={110} height={110}
       onClick={onClick}
       className={cn("cursor-pointer select-none", animClass)}
       style={{ filter: `drop-shadow(0 0 10px ${c}88)`, overflow: "visible" }}
@@ -683,7 +674,7 @@ function CompanionPanel({
   const accent = owner === "jack" ? "hsl(220 80% 60%)" : "hsl(330 75% 65%)";
 
   return (
-    <div className="relative flex flex-col items-center" style={{ width: 100 }}>
+    <div className="relative flex flex-col items-center" style={{ width: 118 }}>
       {/* Chat bubble */}
       {speech && (
         <ChatBubble text={speech} color={def.color} side={bubbleSide} from={owner} />
@@ -717,13 +708,7 @@ function CompanionPanel({
         }
       </div>
 
-      {/* Name tag */}
-      <p
-        className="text-[9px] font-bold uppercase tracking-widest mt-0.5 opacity-60"
-        style={{ color: accent }}
-      >
-        {owner}
-      </p>
+
     </div>
   );
 }
@@ -959,7 +944,7 @@ export default function FloatingCompanions() {
         className="w-full h-px opacity-20"
         style={{
           background: "linear-gradient(to right, transparent, hsl(220 80% 60%), hsl(255 70% 65%), hsl(330 75% 65%), transparent)",
-          width: 220,
+          width: 250,
         }}
       />
     </div>
