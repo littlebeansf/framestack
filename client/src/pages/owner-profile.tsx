@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import type { Profile, Item, Collection } from "@shared/schema";
 import { useToast } from "@/hooks/use-toast";
+import MoodCompanion from "@/components/MoodCompanion";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -837,8 +838,16 @@ export default function OwnerProfilePage({ owner }: { owner: string }) {
   const animClass = getAnimationClass(bgStyle);
   const isAurora = bgStyle === "aurora" || bgStyle === "cosmic";
 
+  // Only jack and sally have companions (not together)
+  const hasCompanion = owner === "jack" || owner === "sally";
+
   return (
     <div className="max-w-2xl animate-page-in space-y-5">
+
+      {/* ── Mood Companion ── */}
+      {hasCompanion && (
+        <MoodCompanion owner={owner as "jack" | "sally"} accent={accent} />
+      )}
 
       {/* ── Hero banner ── */}
       <div className="relative rounded-3xl overflow-hidden" style={{ minHeight: 220 }}>

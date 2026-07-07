@@ -678,4 +678,33 @@ export async function registerRoutes(httpServer: Server, app: Express) {
     storage.deleteMessage(parseInt(req.params.id));
     res.json({ ok: true });
   });
+
+  // ─── Daily Mood ───────────────────────────────────────────────────────────────────────────
+
+  // GET /api/mood/:owner?date=YYYY-MM-DD — get mood for a specific date (default today)
+  app.get("/api/mood/:owner", (req, res) => {
+    const { owner } = req.params;
+    if (owner !== "jack" && owner !== "sally") return res.status(400).json({ error: "Invalid owner" });
+    const date = (req.query.date as string) || new Date().toISOString().slice(0, 10);
+    const mood = storage.getMood(owner, date);
+    res.json(mood ?? null);
+  });
+
+  // GET /api/mood/:owner/history — last 30 days
+  app.get("/api/mood/:owner/history", (req, res) => {
+    const { owner } = req.params;
+    if (owner !== "jack" && owner !== "sally") return res.status(400).json({ error: "Invalid owner" });
+    res.json(storage.getMoodHistory(owner, 30));
+  });
+
+  // POST /api/mood/:owner — upsert today's mood
+  app.post("/api/mood/:owner", (req, res) => {
+    const { owner } = req.params;
+    if (owner !== "jack" && owner !== "sally") return res.status(400).json({ error: "Invalid owner" });
+    const { mood, note, date } = req.body;
+    if (!mood) return res.status(400).json({ error: "mood required" });
+    const today = date || new Date().toISOString().slice(0, 10);
+    const result = storage.upsertMood(owner, today, mood, note);
+    res.json(result);
+  });
 }

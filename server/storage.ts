@@ -1,6 +1,6 @@
 import { eq, and, desc } from "drizzle-orm";
 import {
-  users, items, collections, collectionItems, profiles, links, linkLists, secretMessages, quotes, restaurants,
+  users, items, collections, collectionItems, profiles, links, linkLists, secretMessages, quotes, restaurants, dailyMoods,
   type User, type InsertUser,
   type Item, type InsertItem,
   type Collection, type InsertCollection,
@@ -11,6 +11,7 @@ import {
   type SecretMessage, type InsertSecretMessage,
   type Quote, type InsertQuote,
   type Restaurant, type InsertRestaurant,
+  type DailyMood, type InsertDailyMood,
   type ItemWithStatus,
   OWNERS, DEFAULT_COLLECTIONS,
 } from "@shared/schema";
@@ -142,6 +143,16 @@ try { sqlite.exec(`ALTER TABLE links ADD COLUMN list_id INTEGER NOT NULL DEFAULT
 try { sqlite.exec(`ALTER TABLE link_lists ADD COLUMN emoji TEXT`); } catch {}
 try { sqlite.exec(`ALTER TABLE links ADD COLUMN icon TEXT`); } catch {}
 try { sqlite.exec(`ALTER TABLE links ADD COLUMN locked INTEGER NOT NULL DEFAULT 0`); } catch {}
+// Migrate daily_moods table
+try { sqlite.exec(`CREATE TABLE IF NOT EXISTS daily_moods (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  owner TEXT NOT NULL,
+  date TEXT NOT NULL,
+  mood TEXT NOT NULL,
+  note TEXT,
+  created_at INTEGER NOT NULL DEFAULT 0,
+  UNIQUE(owner, date)
+)`); } catch {}
 // Migrate profiles table — new diary + visual fields
 try { sqlite.exec(`ALTER TABLE profiles ADD COLUMN diary_entry TEXT`); } catch {}
 try { sqlite.exec(`ALTER TABLE profiles ADD COLUMN unpopular_opinion TEXT`); } catch {}
@@ -399,6 +410,11 @@ export interface IStorage {
   createMessage(data: InsertSecretMessage): SecretMessage;
   markRead(id: number): SecretMessage | undefined;       // sets readAt = now
   deleteMessage(id: number): void;
+
+  // Daily Mood
+  getMood(owner: string, date: string): DailyMood | undefined;
+  getMoodHistory(owner: string, limit?: number): DailyMood[];
+  upsertMood(owner: string, date: string, mood: string, note?: string): DailyMood;
 }
 
 export class Storage implements IStorage {
@@ -660,6 +676,32 @@ export class Storage implements IStorage {
   }
   deleteMessage(id: number) {
     db.delete(secretMessages).where(eq(secretMessages.id, id)).run();
+  }
+
+  // ── Daily Mood ────────────────────────────────────────────────────────
+  getMood(owner: string, date: string) {
+    return db.select().from(dailyMoods)
+      .where(and(eq(dailyMoods.owner, owner), eq(dailyMoods.date, date)))
+      .get();
+  }
+  getMoodHistory(owner: string, limit = 30) {
+    return db.select().from(dailyMoods)
+      .where(eq(dailyMoods.owner, owner))
+      .orderBy(desc(dailyMoods.date))
+      .all()
+      .slice(0, limit);
+  }
+  upsertMood(owner: string, date: string, mood: string, note?: string) {
+    const existing = this.getMood(owner, date);
+    if (existing) {
+      return db.update(dailyMoods)
+        .set({ mood, note: note ?? existing.note })
+        .where(eq(dailyMoods.id, existing.id))
+        .returning().get()!;
+    }
+    return db.insert(dailyMoods)
+      .values({ owner, date, mood, note: note ?? null, createdAt: Date.now() })
+      .returning().get()!;
   }
 }
 

@@ -267,6 +267,21 @@ export const insertSecretMessageSchema = createInsertSchema(secretMessages).omit
 export type InsertSecretMessage = z.infer<typeof insertSecretMessageSchema>;
 export type SecretMessage = typeof secretMessages.$inferSelect;
 
+// ─── Daily Mood ──────────────────────────────────────────────────────────────────────
+// One entry per owner per day. mood is one of the MOOD_KEYS.
+export const dailyMoods = sqliteTable("daily_moods", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  owner: text("owner").notNull(),          // "jack" | "sally"
+  date: text("date").notNull(),            // ISO date string "2026-07-07"
+  mood: text("mood").notNull(),            // e.g. "happy" | "sad" | "hyped" ...
+  note: text("note"),                      // optional short thought for the day
+  createdAt: integer("created_at").notNull().default(0),
+});
+
+export const insertDailyMoodSchema = createInsertSchema(dailyMoods).omit({ id: true });
+export type InsertDailyMood = z.infer<typeof insertDailyMoodSchema>;
+export type DailyMood = typeof dailyMoods.$inferSelect;
+
 // ─── Users (legacy, kept for DB compatibility) ────────────────────────────────
 
 export const users = sqliteTable("users", {
