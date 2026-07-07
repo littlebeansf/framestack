@@ -37,32 +37,39 @@ export type Profile = typeof profiles.$inferSelect;
 
 // ─── Media Items (shared library) ─────────────────────────────────────────────
 
-export const MEDIA_TYPES = ["anime", "manga", "movie", "series", "book"] as const;
+export const MEDIA_TYPES = ["anime", "manga", "movie", "series", "book", "podcast"] as const;
 export type MediaType = (typeof MEDIA_TYPES)[number];
 
 // Status sets per media group
 // Anime / Movie / Series: watching, completed, want_to_rewatch, dropped
 // Manga / Book: wishlist, owned, reading, completed
+// Podcast: listening, completed, wishlist, dropped
 export const ANIME_STATUSES = ["watching", "completed", "want_to_rewatch", "dropped"] as const;
 export const BOOK_STATUSES = ["wishlist", "owned", "reading", "completed"] as const;
+export const PODCAST_STATUSES = ["listening", "completed", "wishlist", "dropped"] as const;
 export type AnimeStatus = (typeof ANIME_STATUSES)[number];
 export type BookStatus = (typeof BOOK_STATUSES)[number];
-export type AnyStatus = AnimeStatus | BookStatus;
+export type PodcastStatus = (typeof PODCAST_STATUSES)[number];
+export type AnyStatus = AnimeStatus | BookStatus | PodcastStatus;
 
 // Broad group for UI grouping (library toggle, add-from-library selector)
-export function getMediaGroup(mediaType: string): "anime" | "book" {
+export function getMediaGroup(mediaType: string): "anime" | "book" | "podcast" {
+  if (mediaType === "podcast") return "podcast";
   return mediaType === "manga" || mediaType === "book" ? "book" : "anime";
 }
 
 // Exact media group — used for per-type default collections
-export type ExactMediaGroup = "anime" | "movie" | "series" | "manga" | "book";
+export type ExactMediaGroup = "anime" | "movie" | "series" | "manga" | "book" | "podcast";
 export function getExactMediaGroup(mediaType: string): ExactMediaGroup {
   const t = mediaType as ExactMediaGroup;
-  return (["anime", "movie", "series", "manga", "book"] as ExactMediaGroup[]).includes(t) ? t : "anime";
+  return (["anime", "movie", "series", "manga", "book", "podcast"] as ExactMediaGroup[]).includes(t) ? t : "anime";
 }
 
 export function getStatusesForMediaType(mediaType: string): readonly string[] {
-  return getMediaGroup(mediaType) === "book" ? BOOK_STATUSES : ANIME_STATUSES;
+  const g = getMediaGroup(mediaType);
+  if (g === "podcast") return PODCAST_STATUSES;
+  if (g === "book") return BOOK_STATUSES;
+  return ANIME_STATUSES;
 }
 
 export const STATUS_LABELS: Record<string, string> = {
@@ -75,6 +82,8 @@ export const STATUS_LABELS: Record<string, string> = {
   wishlist: "Wishlist",
   owned: "Owned",
   reading: "Reading",
+  // Podcast
+  listening: "Listening",
 };
 
 export const STATUS_COLORS: Record<string, string> = {
@@ -85,6 +94,7 @@ export const STATUS_COLORS: Record<string, string> = {
   wishlist: "hsl(220 8% 55%)",
   owned: "hsl(30 85% 65%)",
   reading: "hsl(255 75% 70%)",
+  listening: "hsl(190 75% 55%)",
 };
 
 export const items = sqliteTable("items", {
@@ -294,4 +304,9 @@ export const DEFAULT_COLLECTIONS: Array<{
   { name: "Completed",       description: "Books I finished",                      mediaGroup: "book",   defaultStatus: "completed" },
   { name: "Wishlist",        description: "Books I want to read",                  mediaGroup: "book",   defaultStatus: "wishlist" },
   { name: "Owned",           description: "Books I own but haven't started",       mediaGroup: "book",   defaultStatus: "owned" },
+  // ── Podcast
+  { name: "Listening",       description: "Podcasts I'm currently listening to",   mediaGroup: "podcast", defaultStatus: "listening" },
+  { name: "Completed",       description: "Podcasts I finished",                   mediaGroup: "podcast", defaultStatus: "completed" },
+  { name: "Wishlist",        description: "Podcasts I want to listen to",          mediaGroup: "podcast", defaultStatus: "wishlist" },
+  { name: "Dropped",         description: "Podcasts I stopped listening to",       mediaGroup: "podcast", defaultStatus: "dropped" },
 ];

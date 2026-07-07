@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
-import { Search, Plus, Loader2, BookOpen, Tv, Film, Star, Book, Check, Library } from "lucide-react";
+import { Search, Plus, Loader2, BookOpen, Tv, Film, Star, Book, Check, Library, Mic2 } from "lucide-react";
 import type { Item } from "@shared/schema";
 import { cn } from "@/lib/utils";
 import { searchAll, type SearchResult } from "@/lib/search";
@@ -17,10 +17,10 @@ import { apiRequest } from "@/lib/queryClient";
 import { localStore } from "@/lib/localStore";
 
 const TYPE_ICONS: Record<string, any> = {
-  anime: Star, manga: BookOpen, movie: Film, series: Tv, book: Book,
+  anime: Star, manga: BookOpen, movie: Film, series: Tv, book: Book, podcast: Mic2,
 };
 const TYPE_LABELS: Record<string, string> = {
-  anime: "Anime", manga: "Manga", movie: "Movie", series: "Series", book: "Book",
+  anime: "Anime", manga: "Manga", movie: "Movie", series: "Series", book: "Book", podcast: "Podcast",
 };
 
 // Particle burst on "Add" button
@@ -164,6 +164,7 @@ export default function SearchDialog({
                 <SelectItem value="movie">🎬 Movie</SelectItem>
                 <SelectItem value="series">📺 Series</SelectItem>
                 <SelectItem value="book">📚 Book</SelectItem>
+                <SelectItem value="podcast">🎧 Podcast</SelectItem>
               </SelectContent>
             </Select>
             <div className="relative flex-1">

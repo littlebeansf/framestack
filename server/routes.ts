@@ -282,6 +282,30 @@ export async function registerRoutes(httpServer: Server, app: Express) {
   });
 
   // ─── Link Lists ─────────────────────────────────────────────────────────────────
+  // Podcast search via iTunes Search API (free, no key needed)
+  app.get("/api/search/podcast", async (req, res) => {
+    try {
+      const q = req.query.q as string;
+      if (!q?.trim()) return res.json([]);
+      const url = `https://itunes.apple.com/search?term=${encodeURIComponent(q)}&entity=podcast&limit=15&media=podcast`;
+      const r = await fetch(url, { signal: AbortSignal.timeout(8000) });
+      if (!r.ok) return res.json([]);
+      const data: any = await r.json();
+      const results = (data.results || []).map((p: any) => ({
+        externalId: String(p.collectionId),
+        externalSource: "itunes",
+        title: p.collectionName,
+        coverUrl: p.artworkUrl600 || p.artworkUrl100,
+        year: p.releaseDate ? p.releaseDate.slice(0, 4) : undefined,
+        mediaType: "podcast",
+        studio: p.artistName,                   // host / publisher
+        genres: p.genres ? JSON.stringify(p.genres) : undefined,
+        episodes: p.trackCount || undefined,
+      }));
+      res.json(results);
+    } catch (err: any) { res.status(500).json({ error: err.message }); }
+  });
+
 
   app.get("/api/link-lists", (_req, res) => {
     res.json(storage.getAllLinkLists());

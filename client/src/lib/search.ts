@@ -10,7 +10,7 @@ export interface SearchResult {
   title: string;
   coverUrl?: string;
   year?: string;
-  mediaType: "anime" | "manga" | "movie" | "series" | "book";
+  mediaType: "anime" | "manga" | "movie" | "series" | "book" | "podcast";
   genres?: string;
   author?: string;
   studio?: string;
@@ -120,12 +120,32 @@ async function searchBooksDirect(q: string): Promise<SearchResult[]> {
 
 // ── Aggregate ─────────────────────────────────────────────────────────────────
 
+async function searchPodcastDirect(q: string): Promise<SearchResult[]> {
+  try {
+    const r = await fetch(`https://itunes.apple.com/search?term=${encodeURIComponent(q)}&entity=podcast&limit=15&media=podcast`);
+    if (!r.ok) return [];
+    const data = await r.json();
+    return (data.results || []).map((p: any) => ({
+      externalId: String(p.collectionId),
+      externalSource: "itunes",
+      title: p.collectionName,
+      coverUrl: p.artworkUrl600 || p.artworkUrl100,
+      year: p.releaseDate ? p.releaseDate.slice(0, 4) : undefined,
+      mediaType: "podcast" as const,
+      studio: p.artistName,
+      genres: p.genres ? JSON.stringify(p.genres) : undefined,
+      episodes: p.trackCount || undefined,
+    }));
+  } catch { return []; }
+}
+
 const DIRECT_FALLBACKS: Record<string, (q: string) => Promise<SearchResult[]>> = {
   anime: searchAnimeDirect,
   manga: searchMangaDirect,
   movie: searchMoviesDirect,
   series: searchSeriesDirect,
   book: searchBooksDirect,
+  podcast: searchPodcastDirect,
 };
 
 export async function searchAll(q: string, type?: string): Promise<SearchResult[]> {
@@ -133,7 +153,7 @@ export async function searchAll(q: string, type?: string): Promise<SearchResult[
 
   const types = type
     ? [type]
-    : ["anime", "manga", "movie", "series", "book"];
+    : ["anime", "manga", "movie", "series", "book", "podcast"];
 
   const results = await Promise.all(
     types.map(async (t) => {

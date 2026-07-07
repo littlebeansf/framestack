@@ -14,7 +14,7 @@ import {
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Plus, MoreHorizontal, Trash2, Edit3, ChevronRight, Layers, Sparkles, BookOpen, Film, Star, Tv, Book, Search as SearchIcon, Check, ArrowUpDown } from "lucide-react";
+import { Plus, MoreHorizontal, Trash2, Edit3, ChevronRight, Layers, Sparkles, BookOpen, Film, Star, Tv, Book, Mic2, Search as SearchIcon, Check, ArrowUpDown } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const OWNER_META: Record<string, { label: string; emoji: string; accent: string; emptyMsg: string }> = {
@@ -39,7 +39,7 @@ const OWNER_META: Record<string, { label: string; emoji: string; accent: string;
 };
 
 const TYPE_ICONS: Record<string, any> = {
-  anime: Star, manga: BookOpen, movie: Film, series: Tv, book: Book,
+  anime: Star, manga: BookOpen, movie: Film, series: Tv, book: Book, podcast: Mic2,
 };
 
 // Per-type section config for the collections page
@@ -53,18 +53,20 @@ const MEDIA_TYPE_SECTIONS: Array<{
   { key: "movie",  label: "Movie",  Icon: Film,     statusOrder: ["watching", "completed", "want_to_rewatch", "dropped"] },
   { key: "series", label: "Series", Icon: Tv,       statusOrder: ["watching", "completed", "want_to_rewatch", "dropped"] },
   { key: "manga",  label: "Manga",  Icon: BookOpen, statusOrder: ["reading", "completed", "wishlist", "owned"] },
-  { key: "book",   label: "Book",   Icon: Book,     statusOrder: ["reading", "completed", "wishlist", "owned"] },
+  { key: "book",    label: "Book",    Icon: Book,     statusOrder: ["reading", "completed", "wishlist", "owned"] },
+  { key: "podcast", label: "Podcast", Icon: Mic2,     statusOrder: ["listening", "completed", "wishlist", "dropped"] },
 ];
 
 // Tab config (media types + custom)
-type TabKey = "anime" | "movie" | "series" | "manga" | "book" | "custom";
+type TabKey = "anime" | "movie" | "series" | "manga" | "book" | "podcast" | "custom";
 const COLLECTION_TABS: Array<{ key: TabKey; label: string; Icon: any }> = [
-  { key: "anime",  label: "Anime",  Icon: Star },
-  { key: "movie",  label: "Movie",  Icon: Film },
-  { key: "series", label: "Series", Icon: Tv },
-  { key: "manga",  label: "Manga",  Icon: BookOpen },
-  { key: "book",   label: "Book",   Icon: Book },
-  { key: "custom", label: "Custom", Icon: Sparkles },
+  { key: "anime",   label: "Anime",   Icon: Star },
+  { key: "movie",   label: "Movie",   Icon: Film },
+  { key: "series",  label: "Series",  Icon: Tv },
+  { key: "manga",   label: "Manga",   Icon: BookOpen },
+  { key: "book",    label: "Book",    Icon: Book },
+  { key: "podcast", label: "Podcast", Icon: Mic2 },
+  { key: "custom",  label: "Custom",  Icon: Sparkles },
 ];
 
 // A horizontal strip of up to 5 covers at the top of each collection card.
@@ -264,7 +266,7 @@ function AddToCollectionDialog({
 
 type SortMode = "recent" | "title" | "rating" | "year";
 
-function LibraryMirror({ owner, ownerCollections, mediaGroup }: { owner: string; ownerCollections: Collection[]; mediaGroup: "anime" | "book" }) {
+function LibraryMirror({ owner, ownerCollections, mediaGroup }: { owner: string; ownerCollections: Collection[]; mediaGroup: "anime" | "book" | "podcast" }) {
   const { data: allItems } = useQuery<Item[]>({ queryKey: ["/api/items"] });
   const [search, setSearch] = useState("");
   const [addTarget, setAddTarget] = useState<Item | null>(null);
@@ -277,8 +279,11 @@ function LibraryMirror({ owner, ownerCollections, mediaGroup }: { owner: string;
 
   const ANIME_TYPES = ["anime", "movie", "series"];
   const BOOK_TYPES = ["manga", "book"];
+  const PODCAST_TYPES = ["podcast"];
   const SUB_TYPES = mediaGroup === "anime"
     ? ["all", "anime", "movie", "series"]
+    : mediaGroup === "podcast"
+    ? ["all", "podcast"]
     : ["all", "manga", "book"];
 
   const sorted = [...(allItems || [])].sort((a, b) => {
@@ -291,6 +296,8 @@ function LibraryMirror({ owner, ownerCollections, mediaGroup }: { owner: string;
   const filtered = sorted.filter(i => {
     const typeMatch = mediaGroup === "anime"
       ? ANIME_TYPES.includes(i.mediaType)
+      : mediaGroup === "podcast"
+      ? PODCAST_TYPES.includes(i.mediaType)
       : BOOK_TYPES.includes(i.mediaType);
     if (!typeMatch) return false;
     if (subTypeFilter !== "all" && i.mediaType !== subTypeFilter) return false;
@@ -395,7 +402,7 @@ function LibraryMirror({ owner, ownerCollections, mediaGroup }: { owner: string;
         <p className="text-xs text-muted-foreground py-4 text-center">Library is empty. Add items via the search button.</p>
       ) : filtered.length === 0 ? (
         <p className="text-xs text-muted-foreground py-4 text-center">
-          {search ? `No results for "${search}".` : `No ${subTypeFilter !== "all" ? subTypeFilter : (mediaGroup === "anime" ? "anime, movies or series" : "manga or books")} in the library yet.`}
+          {search ? `No results for "${search}".` : `No ${subTypeFilter !== "all" ? subTypeFilter : (mediaGroup === "anime" ? "anime, movies or series" : mediaGroup === "podcast" ? "podcasts" : "manga or books")} in the library yet.`}
         </p>
       ) : (
         <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-7 gap-2">
@@ -648,7 +655,7 @@ export default function OwnerCollectionsPage({ owner }: { owner: string }) {
   const [createOpen, setCreateOpen] = useState(false);
   const [editTarget, setEditTarget] = useState<Collection | null>(null);
   const [showMirror, setShowMirror] = useState(false);
-  const [mirrorMediaGroup, setMirrorMediaGroup] = useState<"anime" | "book">("anime");
+  const [mirrorMediaGroup, setMirrorMediaGroup] = useState<"anime" | "book" | "podcast">("anime");
   const [activeTab, setActiveTab] = useState<TabKey>("anime");
   const [, setLocation] = useLocation();
   const { toast } = useToast();
@@ -763,7 +770,7 @@ export default function OwnerCollectionsPage({ owner }: { owner: string }) {
           <div className="flex items-center justify-between">
             <p className="text-sm font-semibold text-foreground">Library — add to {meta.emoji}</p>
             <div className="flex gap-1">
-              {(["anime", "book"] as const).map(g => (
+              {(["anime", "book", "podcast"] as const).map(g => (
                 <button
                   key={g}
                   onClick={() => setMirrorMediaGroup(g)}
@@ -774,7 +781,7 @@ export default function OwnerCollectionsPage({ owner }: { owner: string }) {
                       : "border-border text-muted-foreground hover:bg-secondary"
                   )}
                 >
-                  {g === "anime" ? "Anime · Movie · Series" : "Manga · Book"}
+                  {g === "anime" ? "Anime · Movie · Series" : g === "podcast" ? "🎧 Podcast" : "Manga · Book"}
                 </button>
               ))}
             </div>
