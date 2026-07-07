@@ -7,6 +7,7 @@ import { apiRequest, API_BASE } from "@/lib/queryClient";
 import { cn } from "@/lib/utils";
 import { Library, Search, Menu, Sun, Moon, Sparkles, Download } from "lucide-react";
 import SearchDialog from "@/components/SearchDialog";
+import FloatingCompanions from "@/components/FloatingCompanions";
 import type { Profile } from "@shared/schema";
 
 // Default emojis — used until profile data loads
@@ -344,6 +345,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
       </div>
 
       <SearchDialog open={searchOpen} onOpenChange={setSearchOpen} />
+      <FloatingCompanions />
     </div>
   );
 }
