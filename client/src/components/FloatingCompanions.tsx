@@ -759,6 +759,77 @@ function pickCrossLine(speaker: "jack" | "sally", mood: MoodKey): string {
   return lines[Math.floor(Math.random() * lines.length)];
 }
 
+
+// ── Per-mood sync effect between the two companions ───────────────────────────
+// Renders between Jack & Sally when they share the same mood.
+
+const SYNC_EFFECTS: Record<MoodKey, { particles: string[]; label: string; color: string }> = {
+  happy:   { particles: ["⭐","✨","🌟"], label: "vibing~",       color: "#facc15" },
+  sad:     { particles: ["💧","🌧️","☁️"], label: "together…",    color: "#60a5fa" },
+  hyped:   { particles: ["⚡","🔥","💥"], label: "LETS GOOO",     color: "#f97316" },
+  cozy:    { particles: ["🍵","🌿","✿"],  label: "cozy corner~", color: "#a78bfa" },
+  tired:   { particles: ["💤","😴","z"],  label: "zzz…",          color: "#94a3b8" },
+  loved:   { particles: ["💖","💗","♡"],  label: "♡",            color: "#f472b6" },
+  chaotic: { particles: ["🌀","❓","💫"], label: "??????",        color: "#c084fc" },
+  numb:    { particles: ["🩶","…","·"],   label: "…",             color: "#6b7280" },
+};
+
+function SyncEffect({ mood }: { mood: MoodKey }) {
+  const { particles, label, color } = SYNC_EFFECTS[mood];
+  // 6 floating particles, staggered, looping up between the two creatures
+  return (
+    <div
+      className="absolute pointer-events-none select-none overflow-visible"
+      style={{ zIndex: 30, left: "50%", bottom: 10, transform: "translateX(-50%)" }}
+    >
+      <style>{`
+        @keyframes sync-rise-0 { 0%{transform:translateY(0) translateX(-8px) scale(0.6);opacity:0} 20%{opacity:1} 80%{opacity:0.8} 100%{transform:translateY(-54px) translateX(-12px) scale(1.1);opacity:0} }
+        @keyframes sync-rise-1 { 0%{transform:translateY(0) translateX(6px) scale(0.5);opacity:0}  20%{opacity:1} 80%{opacity:0.8} 100%{transform:translateY(-60px) translateX(10px) scale(1);opacity:0} }
+        @keyframes sync-rise-2 { 0%{transform:translateY(0) translateX(-2px) scale(0.7);opacity:0} 20%{opacity:1} 80%{opacity:0.7} 100%{transform:translateY(-48px) translateX(4px) scale(0.9);opacity:0} }
+        @keyframes sync-rise-3 { 0%{transform:translateY(0) translateX(10px) scale(0.4);opacity:0} 20%{opacity:1} 80%{opacity:0.6} 100%{transform:translateY(-56px) translateX(6px) scale(1.2);opacity:0} }
+        @keyframes sync-rise-4 { 0%{transform:translateY(0) translateX(-14px) scale(0.6);opacity:0}20%{opacity:1} 80%{opacity:0.5} 100%{transform:translateY(-44px) translateX(-8px) scale(0.8);opacity:0} }
+        @keyframes sync-rise-5 { 0%{transform:translateY(0) translateX(4px) scale(0.5);opacity:0}  20%{opacity:1} 80%{opacity:0.9} 100%{transform:translateY(-52px) translateX(-4px) scale(1);opacity:0} }
+        @keyframes sync-pulse  { 0%,100%{opacity:0.5;transform:scale(0.9)} 50%{opacity:1;transform:scale(1.1)} }
+      `}</style>
+
+      {/* Rising particles */}
+      {[0,1,2,3,4,5].map(i => (
+        <div
+          key={i}
+          className="absolute text-sm"
+          style={{
+            left: 0, bottom: 0,
+            animation: `sync-rise-${i} ${2.2 + i * 0.35}s ${i * 0.45}s ease-out infinite`,
+            filter: `drop-shadow(0 0 4px ${color})`,
+          }}
+        >
+          {particles[i % particles.length]}
+        </div>
+      ))}
+
+      {/* Label tag */}
+      <div
+        className="absolute text-center"
+        style={{
+          bottom: 58,
+          left: "50%",
+          transform: "translateX(-50%)",
+          whiteSpace: "nowrap",
+          fontSize: 9,
+          fontWeight: 700,
+          letterSpacing: "0.08em",
+          textTransform: "uppercase",
+          color,
+          animation: "sync-pulse 2s ease-in-out infinite",
+          textShadow: `0 0 8px ${color}99`,
+        }}
+      >
+        {label}
+      </div>
+    </div>
+  );
+}
+
 // ── Main FloatingCompanions component ─────────────────────────────────────────
 
 export default function FloatingCompanions() {
@@ -766,9 +837,16 @@ export default function FloatingCompanions() {
   const [sallySpeech, setSallySpeech] = useState("");
   const [collapsed, setCollapsed] = useState(false);
 
-  // Refs for current moods (updated by child onMoodChange callbacks)
+  // Track both moods as state so the parent can react to matching
+  const [jackMood, setJackMood] = useState<MoodKey>("happy");
+  const [sallyMood, setSallyMood] = useState<MoodKey>("happy");
+
+  // Refs keep the chat scheduler in sync without stale closures
   const jackMoodRef  = useRef<MoodKey>("happy");
   const sallyMoodRef = useRef<MoodKey>("happy");
+
+  const bothSameMood = jackMood === sallyMood;
+  const sharedMood   = jackMood; // same as sallyMood when bothSameMood
 
   // Auto-chat scheduler
   useEffect(() => {
@@ -854,14 +932,17 @@ export default function FloatingCompanions() {
           speech={jackSpeech}
           bubbleSide="left"
           onCreatureClick={handleJackClick}
-          onMoodChange={(k) => { jackMoodRef.current = k; }}
+          onMoodChange={(k) => { jackMoodRef.current = k; setJackMood(k); }}
         />
 
-        {/* Ground connector line */}
-        <div
-          className="w-px self-stretch mb-10 opacity-20"
-          style={{ background: "linear-gradient(to bottom, transparent, hsl(255 70% 65%))" }}
-        />
+        {/* Center column — connector line + sync effect */}
+        <div className="relative w-px self-stretch mb-10" style={{ minWidth: 1 }}>
+          <div
+            className="w-full h-full opacity-20"
+            style={{ background: "linear-gradient(to bottom, transparent, hsl(255 70% 65%))" }}
+          />
+          {bothSameMood && <SyncEffect mood={sharedMood} />}
+        </div>
 
         {/* Sally (right) */}
         <CompanionPanel
@@ -869,7 +950,7 @@ export default function FloatingCompanions() {
           speech={sallySpeech}
           bubbleSide="right"
           onCreatureClick={handleSallyClick}
-          onMoodChange={(k) => { sallyMoodRef.current = k; }}
+          onMoodChange={(k) => { sallyMoodRef.current = k; setSallyMood(k); }}
         />
       </div>
 
