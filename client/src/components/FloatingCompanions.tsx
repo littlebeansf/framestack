@@ -680,15 +680,16 @@ function CompanionPanel({
         <ChatBubble text={speech} color={def.color} side={bubbleSide} from={owner} />
       )}
 
-      {/* Mood badge above head */}
-      <button
-        onClick={() => setShowPicker(v => !v)}
-        title="Change mood"
-        className="absolute z-20 rounded-full text-sm leading-none transition-transform hover:scale-125 active:scale-90"
-        style={{ top: 2, [owner === "jack" ? "left" : "right"]: 6 }}
-      >
-        {def.emoji}
-      </button>
+      {/* Mood badge — floats above creature head, centered */}
+      <div className="relative z-10 flex justify-center mb-1">
+        <button
+          onClick={() => setShowPicker(v => !v)}
+          title="Change mood"
+          className="text-base leading-none transition-transform hover:scale-125 active:scale-90"
+        >
+          {def.emoji}
+        </button>
+      </div>
 
       {/* Mood picker */}
       {showPicker && (
@@ -817,10 +818,31 @@ function SyncEffect({ mood }: { mood: MoodKey }) {
 
 // ── Main FloatingCompanions component ─────────────────────────────────────────
 
+type Corner = "bottom-right" | "bottom-left" | "top-right" | "top-left";
+
+const CORNER_LABELS: Record<Corner, string> = {
+  "bottom-right": "↘ Bottom right",
+  "bottom-left":  "↙ Bottom left",
+  "top-right":    "↗ Top right",
+  "top-left":     "↖ Top left",
+};
+
+function cornerStyle(corner: Corner): React.CSSProperties {
+  const GAP = 16; // px from window edge — enough so they're fully visible
+  const style: React.CSSProperties = { position: "fixed", zIndex: 40 };
+  if (corner === "bottom-right") { style.bottom = GAP; style.right  = GAP; }
+  if (corner === "bottom-left")  { style.bottom = GAP; style.left   = GAP; }
+  if (corner === "top-right")    { style.top    = GAP; style.right  = GAP; }
+  if (corner === "top-left")     { style.top    = GAP; style.left   = GAP; }
+  return style;
+}
+
 export default function FloatingCompanions() {
   const [jackSpeech, setJackSpeech] = useState("");
   const [sallySpeech, setSallySpeech] = useState("");
   const [collapsed, setCollapsed] = useState(false);
+  const [corner, setCorner] = useState<Corner>("bottom-right");
+  const [showSettings, setShowSettings] = useState(false);
 
   // Track both moods as state so the parent can react to matching
   const [jackMood, setJackMood] = useState<MoodKey>("happy");
@@ -832,6 +854,9 @@ export default function FloatingCompanions() {
 
   const bothSameMood = jackMood === sallyMood;
   const sharedMood   = jackMood; // same as sallyMood when bothSameMood
+
+  const isBottom = corner.startsWith("bottom");
+  const isRight  = corner.endsWith("right");
 
   // Auto-chat scheduler
   useEffect(() => {
@@ -876,77 +901,111 @@ export default function FloatingCompanions() {
   if (collapsed) {
     return (
       <div
-        className="hidden md:flex fixed bottom-6 right-6 z-40 items-center gap-1 cursor-pointer select-none"
+        className="hidden md:flex items-center gap-1 cursor-pointer select-none"
+        style={cornerStyle(corner)}
         onClick={() => setCollapsed(false)}
         title="Show companions"
       >
-        <span className="text-2xl">👻</span>
-        <span className="text-2xl">🦊</span>
-        <span
-          className="ml-1 text-[10px] font-bold uppercase tracking-widest opacity-40 hover:opacity-80 transition-opacity"
-          style={{ color: "hsl(255 70% 65%)" }}
-        >
-          companions
-        </span>
+        <span className="text-xl">👻</span>
+        <span className="text-xl">🦊</span>
       </div>
     );
   }
 
+  // Bubble side flips based on horizontal position
+  const jackBubble:  "left" | "right" = isRight ? "left"  : "right";
+  const sallyBubble: "left" | "right" = isRight ? "right" : "left";
+
   return (
     <div
-      className="hidden md:flex fixed bottom-0 right-6 z-40 flex-col items-end"
-      style={{ pointerEvents: "none" }}
+      className="hidden md:block"
+      style={{ ...cornerStyle(corner), pointerEvents: "none" }}
     >
+      {/* Settings panel */}
+      {showSettings && (
+        <div
+          className="absolute z-50 rounded-2xl border border-border/60 shadow-2xl p-3 mb-2"
+          style={{
+            bottom: isBottom ? "100%" : undefined,
+            top: !isBottom ? "100%" : undefined,
+            [isRight ? "right" : "left"]: 0,
+            marginBottom: isBottom ? 8 : undefined,
+            marginTop: !isBottom ? 8 : undefined,
+            background: "rgba(14,14,22,0.98)",
+            backdropFilter: "blur(16px)",
+            width: 176,
+            pointerEvents: "auto",
+          }}
+        >
+          <p className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground mb-2">Position</p>
+          <div className="grid grid-cols-2 gap-1.5">
+            {(Object.keys(CORNER_LABELS) as Corner[]).map(c => (
+              <button
+                key={c}
+                onClick={() => { setCorner(c); setShowSettings(false); }}
+                className="text-[10px] font-medium px-2 py-1.5 rounded-xl border-2 transition-all hover:scale-105 active:scale-95 text-left"
+                style={{
+                  borderColor: corner === c ? "hsl(255 70% 65%)" : "transparent",
+                  background: corner === c ? "hsl(255 70% 65% / 0.15)" : "rgba(255,255,255,0.04)",
+                  color: corner === c ? "hsl(255 70% 65%)" : "rgba(255,255,255,0.5)",
+                }}
+              >
+                {CORNER_LABELS[c]}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Companions row */}
       <div
         className="flex items-end gap-1 relative"
-        style={{ pointerEvents: "auto" }}
+        style={{ pointerEvents: "auto", flexDirection: isRight ? "row" : "row-reverse" }}
       >
-        {/* Collapse button */}
-        <button
-          onClick={() => setCollapsed(true)}
-          className="absolute top-2 right-0 z-50 text-[9px] font-bold uppercase tracking-widest opacity-30 hover:opacity-70 transition-opacity text-muted-foreground"
-          title="Hide companions"
+        {/* Controls: settings + collapse */}
+        <div
+          className="absolute flex gap-1 z-50"
+          style={{ top: -18, [isRight ? "right" : "left"]: 0 }}
         >
-          ✕
-        </button>
+          <button
+            onClick={() => setShowSettings(v => !v)}
+            className="text-[9px] opacity-30 hover:opacity-70 transition-opacity text-muted-foreground"
+            title="Position"
+          >
+            ⊹
+          </button>
+          <button
+            onClick={() => setCollapsed(true)}
+            className="text-[9px] opacity-30 hover:opacity-70 transition-opacity text-muted-foreground"
+            title="Hide"
+          >
+            ✕
+          </button>
+        </div>
 
-        {/* Jack (left) */}
+        {/* Jack */}
         <CompanionPanel
           owner="jack"
           speech={jackSpeech}
-          bubbleSide="left"
+          bubbleSide={jackBubble}
           onCreatureClick={handleJackClick}
           onMoodChange={(k) => { jackMoodRef.current = k; setJackMood(k); }}
         />
 
-        {/* Center column — connector line + sync effect */}
-        <div className="relative w-px self-stretch mb-10" style={{ minWidth: 1 }}>
-          <div
-            className="w-full h-full opacity-20"
-            style={{ background: "linear-gradient(to bottom, transparent, hsl(255 70% 65%))" }}
-          />
+        {/* Center — sync effect */}
+        <div className="relative self-stretch" style={{ width: 8 }}>
           {bothSameMood && <SyncEffect mood={sharedMood} />}
         </div>
 
-        {/* Sally (right) */}
+        {/* Sally */}
         <CompanionPanel
           owner="sally"
           speech={sallySpeech}
-          bubbleSide="right"
+          bubbleSide={sallyBubble}
           onCreatureClick={handleSallyClick}
           onMoodChange={(k) => { sallyMoodRef.current = k; setSallyMood(k); }}
         />
       </div>
-
-      {/* Shelf they sit on */}
-      <div
-        className="w-full h-px opacity-20"
-        style={{
-          background: "linear-gradient(to right, transparent, hsl(220 80% 60%), hsl(255 70% 65%), hsl(330 75% 65%), transparent)",
-          width: 250,
-        }}
-      />
     </div>
   );
 }
