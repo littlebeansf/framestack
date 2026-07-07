@@ -184,6 +184,7 @@ export const links = sqliteTable("links", {
   favicon: text("favicon"),   // favicon URL (cached from origin)
   addedBy: text("added_by"),  // "jack" | "sally" | null
   icon: text("icon"),         // optional emoji or short tag e.g. "🎬" "inspo" "must"
+  locked: integer("locked").notNull().default(0), // 1 = locked (blocks external link open)
   createdAt: integer("created_at").notNull().default(0),
 });
 

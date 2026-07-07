@@ -17,7 +17,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import {
   MapPin, List, Star, Pencil, Trash2, X, Check, Plus,
-  Map as MapIcon, Loader2, Search,
+  Map as MapIcon, Loader2,
 } from "lucide-react";
 
 // ── Leaflet CSS (injected once) ───────────────────────────────────────────────
@@ -78,16 +78,21 @@ function getCuisineLabel(id: string) {
 type FilterStatus = "all" | "want_to_go" | "been";
 type ViewMode = "map" | "list";
 
-// ── Geocoding via Nominatim ───────────────────────────────────────────────────
-async function geocodeAddress(address: string): Promise<{ lat: number; lng: number; displayName: string } | null> {
+// ── Nominatim autocomplete types ────────────────────────────────────────────
+interface NominatimResult {
+  place_id: number;
+  display_name: string;
+  lat: string;
+  lon: string;
+}
+
+async function searchNominatim(query: string): Promise<NominatimResult[]> {
   try {
-    const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(address)}&limit=1`;
+    const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=5&addressdetails=0`;
     const r = await fetch(url, { headers: { "Accept-Language": "en" } });
-    if (!r.ok) return null;
-    const data = await r.json();
-    if (!data.length) return null;
-    return { lat: parseFloat(data[0].lat), lng: parseFloat(data[0].lon), displayName: data[0].display_name };
-  } catch { return null; }
+    if (!r.ok) return [];
+    return await r.json();
+  } catch { return []; }
 }
 
 // ── Star rating ───────────────────────────────────────────────────────────────
@@ -134,62 +139,78 @@ function CuisinePicker({ value, onChange }: { value: string[]; onChange: (v: str
   );
 }
 
-// ── Address field with geocode button ─────────────────────────────────────────
-function AddressField({ address, setAddress, onGeocoded, currentLat, currentLng }: {
+// ── Address autocomplete (Nominatim) ───────────────────────────────────────
+function AddressField({ address, setAddress, onGeocoded }: {
   address: string;
   setAddress: (v: string) => void;
-  onGeocoded: (lat: number, lng: number) => void;
-  currentLat: number | null;
-  currentLng: number | null;
+  onGeocoded: (lat: number, lng: number, displayName: string) => void;
 }) {
-  const [geocoding, setGeocoding] = useState(false);
-  const [geocodeError, setGeocodeError] = useState("");
-  const hasPinned = currentLat != null && currentLng != null;
+  const [suggestions, setSuggestions] = useState<NominatimResult[]>([]);
+  const [open, setOpen] = useState(false);
+  const [searching, setSearching] = useState(false);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
 
-  async function handleGeocode() {
-    if (!address.trim()) return;
-    setGeocoding(true);
-    setGeocodeError("");
-    const result = await geocodeAddress(address.trim());
-    setGeocoding(false);
-    if (result) {
-      onGeocoded(result.lat, result.lng);
-    } else {
-      setGeocodeError("Address not found — try being more specific.");
-    }
+  function handleChange(v: string) {
+    setAddress(v);
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    if (!v.trim() || v.trim().length < 3) { setSuggestions([]); setOpen(false); return; }
+    setSearching(true);
+    debounceRef.current = setTimeout(async () => {
+      const results = await searchNominatim(v.trim());
+      setSuggestions(results);
+      setOpen(results.length > 0);
+      setSearching(false);
+    }, 350);
   }
 
+  function handleSelect(result: NominatimResult) {
+    setAddress(result.display_name);
+    setSuggestions([]);
+    setOpen(false);
+    onGeocoded(parseFloat(result.lat), parseFloat(result.lon), result.display_name);
+  }
+
+  // Close dropdown on outside click
+  useEffect(() => {
+    function onClickOutside(e: MouseEvent) {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", onClickOutside);
+    return () => document.removeEventListener("mousedown", onClickOutside);
+  }, []);
+
   return (
-    <div className="flex flex-col gap-1">
-      <div className="flex gap-2">
+    <div ref={containerRef} className="relative">
+      <div className="relative">
         <Input
           data-testid="input-restaurant-address"
-          placeholder="Address or place name"
+          placeholder="Search address or place name…"
           value={address}
-          onChange={e => { setAddress(e.target.value); setGeocodeError(""); }}
-          className="h-10 text-sm flex-1"
-          onKeyDown={e => e.key === "Enter" && handleGeocode()}
+          onChange={e => handleChange(e.target.value)}
+          className="h-10 text-sm pr-8"
+          autoComplete="off"
         />
-        <button
-          type="button"
-          onClick={handleGeocode}
-          disabled={!address.trim() || geocoding}
-          className="h-10 px-3 rounded-lg border border-border flex items-center gap-1.5 text-xs font-semibold
-            text-muted-foreground hover:text-foreground hover:border-foreground/30 transition-all flex-shrink-0
-            disabled:opacity-40"
-          title="Find on map"
-        >
-          {geocoding ? <Loader2 size={13} className="animate-spin" /> : <Search size={13} />}
-          Find
-        </button>
+        {searching && (
+          <Loader2 size={13} className="absolute right-3 top-1/2 -translate-y-1/2 animate-spin text-muted-foreground" />
+        )}
       </div>
-      {hasPinned && !geocodeError && (
-        <p className="text-[10px] text-green-500 font-semibold flex items-center gap-1">
-          <MapPin size={9} /> Pinned on map ({currentLat!.toFixed(4)}, {currentLng!.toFixed(4)})
-        </p>
-      )}
-      {geocodeError && (
-        <p className="text-[10px] text-destructive">{geocodeError}</p>
+      {open && suggestions.length > 0 && (
+        <div className="absolute z-50 left-0 right-0 mt-1 rounded-xl border border-border bg-card shadow-lg overflow-hidden">
+          {suggestions.map(s => (
+            <button
+              key={s.place_id}
+              type="button"
+              className="w-full text-left px-3 py-2.5 text-xs hover:bg-secondary transition-colors border-b border-border/50 last:border-b-0 flex items-start gap-2"
+              onMouseDown={e => { e.preventDefault(); handleSelect(s); }}
+            >
+              <MapPin size={11} className="flex-shrink-0 mt-0.5" style={{ color: ACCENT }} />
+              <span className="text-foreground leading-snug">{s.display_name}</span>
+            </button>
+          ))}
+        </div>
       )}
     </div>
   );
@@ -214,8 +235,9 @@ const EMPTY_FORM: FormState = {
   rating: null, notes: "", addedBy: "", lat: null, lng: null,
 };
 
-function RestaurantForm({ initial, onSave, onCancel, isSaving }: {
+function RestaurantForm({ initial, onSave, onCancel, isSaving, onGeocoded: onParentGeocoded }: {
   initial: FormState; onSave: (f: FormState) => void; onCancel: () => void; isSaving: boolean;
+  onGeocoded?: (lat: number, lng: number) => void;
 }) {
   const [f, setF] = useState<FormState>(initial);
   const set = (k: keyof FormState, v: any) => setF(prev => ({ ...prev, [k]: v }));
@@ -230,14 +252,17 @@ function RestaurantForm({ initial, onSave, onCancel, isSaving }: {
           onChange={e => set("name", e.target.value)} className="h-10 text-sm flex-1" autoFocus />
       </div>
 
-      {/* Address with geocoding */}
+      {/* Address autocomplete */}
       <AddressField
         address={f.address}
         setAddress={v => set("address", v)}
-        onGeocoded={(lat, lng) => setF(prev => ({ ...prev, lat, lng }))}
-        currentLat={f.lat}
-        currentLng={f.lng}
+        onGeocoded={(lat, lng, displayName) => { setF(prev => ({ ...prev, lat, lng, address: displayName })); onParentGeocoded?.(lat, lng); }}
       />
+      {f.lat != null && f.lng != null && (
+        <p className="text-[10px] text-green-500 font-semibold flex items-center gap-1">
+          <MapPin size={9} /> Pinned ({f.lat.toFixed(4)}, {f.lng.toFixed(4)})
+        </p>
+      )}
 
       {/* Cuisine tags */}
       <div className="flex flex-col gap-1.5">
@@ -380,19 +405,18 @@ function RestaurantCard({ restaurant, onEdit, onDelete, onStatusToggle }: {
   );
 }
 
-// ── Leaflet map (CartoDB Positron — minimalist) ───────────────────────────────
-function LeafletMap({ restaurants, filterStatus, onMapClick, pendingLatLng }: {
+// ── Leaflet map (OpenStreetMap standard — reliable in sandbox) ───────────────
+function LeafletMap({ restaurants, filterStatus, panTo }: {
   restaurants: Restaurant[];
   filterStatus: FilterStatus;
-  onMapClick: (lat: number, lng: number) => void;
-  pendingLatLng: { lat: number; lng: number } | null;
+  panTo: { lat: number; lng: number } | null;
 }) {
   const mapRef = useRef<any>(null);
   const mapInstanceRef = useRef<any>(null);
   const markersRef = useRef<any[]>([]);
   const pendingMarkerRef = useRef<any>(null);
-  const onMapClickRef = useRef(onMapClick);
-  onMapClickRef.current = onMapClick;
+  const panToRef = useRef(panTo);
+  panToRef.current = panTo;
 
   useEffect(() => {
     ensureLeafletCss();
@@ -403,20 +427,15 @@ function LeafletMap({ restaurants, filterStatus, onMapClick, pendingLatLng }: {
 
       const map = L.map(mapRef.current, {
         center: DEFAULT_CENTER, zoom: DEFAULT_ZOOM,
-        zoomControl: true, attributionControl: false,
+        zoomControl: true, attributionControl: true,
       });
 
-      // CartoDB Positron — clean, minimal, dark-UI friendly
-      L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_matter_no_labels/{z}/{x}/{y}{r}.png", {
-        subdomains: "abcd", maxZoom: 19,
+      // OpenStreetMap standard tiles — always available, no CSP issues
+      L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+        subdomains: "abc",
+        maxZoom: 19,
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright" style="color:#666">OpenStreetMap</a>',
       }).addTo(map);
-
-      // Minimal attribution
-      L.control.attribution({ position: "bottomright", prefix: false })
-        .addAttribution('© <a href="https://carto.com" style="color:#666">CARTO</a>')
-        .addTo(map);
-
-      map.on("click", (e: any) => onMapClickRef.current(e.latlng.lat, e.latlng.lng));
 
       mapInstanceRef.current = map;
     });
@@ -427,7 +446,7 @@ function LeafletMap({ restaurants, filterStatus, onMapClick, pendingLatLng }: {
     };
   }, []);
 
-  // Markers
+  // Markers — re-render when restaurants or filter changes
   useEffect(() => {
     const run = () => {
       import("leaflet").then(L => {
@@ -448,17 +467,17 @@ function LeafletMap({ restaurants, filterStatus, onMapClick, pendingLatLng }: {
 
           const icon = L.divIcon({
             className: "",
-            html: `<div style="width:34px;height:34px;border-radius:50%;background:#16181f;border:2px solid ${color};box-shadow:0 2px 10px ${color}66;display:flex;align-items:center;justify-content:center;font-size:16px;cursor:pointer;">${emoji}</div>`,
+            html: `<div style="width:34px;height:34px;border-radius:50%;background:#fff;border:2px solid ${color};box-shadow:0 2px 10px ${color}66;display:flex;align-items:center;justify-content:center;font-size:16px;cursor:pointer;">${emoji}</div>`,
             iconSize: [34, 34], iconAnchor: [17, 17], popupAnchor: [0, -20],
           });
 
-          const popup = L.popup({ className: "framestack-popup", maxWidth: 220 }).setContent(`
-            <div style="font-family:system-ui;padding:4px 0;min-width:160px;background:#1a1c26;color:#e2e8f0;border-radius:8px;">
+          const popup = L.popup({ maxWidth: 220 }).setContent(`
+            <div style="font-family:system-ui;padding:4px 0;min-width:160px;">
               <div style="font-weight:700;font-size:13px;margin-bottom:3px">${emoji} ${r.name}</div>
-              ${tagStr ? `<div style="font-size:10px;color:#${been ? "4ade80" : "a78bfa"};margin-bottom:3px">${tagStr}</div>` : ""}
-              ${r.address ? `<div style="font-size:11px;color:#94a3b8;display:flex;gap:3px;align-items:center;margin-bottom:3px">📍 ${r.address}</div>` : ""}
-              ${r.rating ? `<div style="margin-top:2px;font-size:11px">${"⭐".repeat(Math.round(r.rating))}</div>` : ""}
-              ${r.notes ? `<div style="font-size:10px;margin-top:4px;color:#64748b;border-top:1px solid #2d3148;padding-top:4px">${r.notes}</div>` : ""}
+              ${tagStr ? `<div style="font-size:10px;margin-bottom:3px;color:${been ? "#16a34a" : "#7c3aed"}">${tagStr}</div>` : ""}
+              ${r.address ? `<div style="font-size:11px;color:#64748b;margin-bottom:3px">📍 ${r.address}</div>` : ""}
+              ${r.rating ? `<div style="font-size:11px">${"⭐".repeat(Math.round(r.rating))}</div>` : ""}
+              ${r.notes ? `<div style="font-size:10px;margin-top:4px;color:#64748b;border-top:1px solid #e2e8f0;padding-top:4px">${r.notes}</div>` : ""}
             </div>
           `);
 
@@ -481,22 +500,22 @@ function LeafletMap({ restaurants, filterStatus, onMapClick, pendingLatLng }: {
     else { const t = setTimeout(run, 300); return () => clearTimeout(t); }
   }, [restaurants, filterStatus]);
 
-  // Pending marker
+  // Pan to location when address is selected from autocomplete
   useEffect(() => {
+    if (!panTo) return;
     import("leaflet").then(L => {
       if (!mapInstanceRef.current) return;
       pendingMarkerRef.current?.remove();
       pendingMarkerRef.current = null;
-      if (!pendingLatLng) return;
       const icon = L.divIcon({
         className: "",
         html: `<div style="width:26px;height:26px;border-radius:50%;background:${ACCENT};border:3px solid white;box-shadow:0 2px 8px #0009;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:bold;">+</div>`,
         iconSize: [26, 26], iconAnchor: [13, 13],
       });
-      pendingMarkerRef.current = L.marker([pendingLatLng.lat, pendingLatLng.lng], { icon })
-        .addTo(mapInstanceRef.current);
+      pendingMarkerRef.current = L.marker([panTo.lat, panTo.lng], { icon }).addTo(mapInstanceRef.current);
+      mapInstanceRef.current.setView([panTo.lat, panTo.lng], 15, { animate: true });
     });
-  }, [pendingLatLng]);
+  }, [panTo]);
 
   return (
     <div ref={mapRef} className="w-full rounded-xl overflow-hidden border border-border" style={{ height: "340px" }} />
@@ -587,10 +606,8 @@ export default function RestaurantTracker() {
     updateMutation.mutate({ id: r.id, body: { status: r.status === "been" ? "want_to_go" : "been" } });
   }
 
-  function handleMapClick(lat: number, lng: number) {
-    setPendingLatLng({ lat, lng });
-    setShowAddForm(true); setEditingRestaurant(null);
-  }
+  // pendingLatLng is now driven by the address autocomplete (onGeocoded callback)
+  // The map shows the pin via panTo={pendingLatLng}
 
   function formInitialFromRestaurant(r: Restaurant): FormState {
     return {
@@ -671,15 +688,10 @@ export default function RestaurantTracker() {
       {/* Map */}
       {view === "map" && (
         <div className="flex flex-col gap-2">
-          <p className="text-xs text-muted-foreground flex items-center gap-1.5">
-            <MapPin size={11} style={{ color: ACCENT }} />
-            Click the map to pin a location, then fill in the form below.
-          </p>
           <LeafletMap
             restaurants={all}
             filterStatus={filterStatus}
-            onMapClick={handleMapClick}
-            pendingLatLng={showAddForm && !editingRestaurant ? pendingLatLng : null}
+            panTo={pendingLatLng}
           />
         </div>
       )}
@@ -689,10 +701,11 @@ export default function RestaurantTracker() {
         <div className="p-4 rounded-xl border border-border bg-secondary/20">
           <p className="text-sm font-bold text-foreground mb-3">Add restaurant</p>
           <RestaurantForm
-            initial={{ ...EMPTY_FORM, lat: pendingLatLng?.lat ?? null, lng: pendingLatLng?.lng ?? null }}
+            initial={EMPTY_FORM}
             onSave={f => handleSave(f)}
             onCancel={() => { setShowAddForm(false); setPendingLatLng(null); }}
             isSaving={createMutation.isPending}
+            onGeocoded={(lat, lng) => { setPendingLatLng({ lat, lng }); }}
           />
         </div>
       )}
@@ -719,6 +732,7 @@ export default function RestaurantTracker() {
             onSave={f => handleSave(f, editingRestaurant.id)}
             onCancel={() => setEditingRestaurant(null)}
             isSaving={updateMutation.isPending}
+            onGeocoded={(lat, lng) => { setPendingLatLng({ lat, lng }); }}
           />
         </div>
       )}

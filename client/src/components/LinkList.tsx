@@ -35,6 +35,8 @@ import {
   Check,
   X,
   ChevronRight,
+  Lock,
+  LockOpen,
 } from "lucide-react";
 
 const ACCENT = "hsl(20 90% 60%)";
@@ -88,15 +90,93 @@ function SortToggle({ sort, onToggle }: { sort: SortDir; onToggle: () => void })
 
 // ── Link row ──────────────────────────────────────────────────────────────────
 
-function LinkRow({ link, onDelete }: { link: Link; onDelete: (id: number) => void }) {
+function LinkRow({ link, onDelete, onUpdate }: {
+  link: Link;
+  onDelete: (id: number) => void;
+  onUpdate: (id: number, data: Partial<{ title: string; url: string; icon: string | null; locked: number }>) => void;
+}) {
+  const { toast } = useToast();
   const [faviconError, setFaviconError] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const [editTitle, setEditTitle] = useState(link.title);
+  const [editUrl, setEditUrl] = useState(link.url);
+  const [editIcon, setEditIcon] = useState(link.icon ?? "");
   const href = ensureHttps(link.url);
+  const locked = (link as any).locked === 1;
 
+  function handleSaveEdit() {
+    const t = editTitle.trim();
+    const u = editUrl.trim();
+    if (!t || !u) return;
+    onUpdate(link.id, { title: t, url: ensureHttps(u), icon: editIcon.trim() || null });
+    setEditing(false);
+  }
+
+  function handleToggleLock() {
+    onUpdate(link.id, { locked: locked ? 0 : 1 });
+  }
+
+  // Editing mode
+  if (editing) {
+    return (
+      <div
+        data-testid={`row-link-${link.id}`}
+        className="flex flex-col gap-2 px-3 py-3 rounded-xl border border-border bg-card"
+      >
+        <div className="flex gap-2">
+          <Input
+            data-testid={`input-edit-link-url-${link.id}`}
+            value={editUrl}
+            onChange={e => setEditUrl(e.target.value)}
+            className="h-9 text-sm flex-1"
+            placeholder="https://..."
+            inputMode="url"
+            onKeyDown={e => e.key === "Enter" && handleSaveEdit()}
+          />
+        </div>
+        <div className="flex gap-2">
+          <Input
+            data-testid={`input-edit-link-title-${link.id}`}
+            value={editTitle}
+            onChange={e => setEditTitle(e.target.value)}
+            className="h-9 text-sm flex-1"
+            placeholder="Title"
+            autoFocus
+            onKeyDown={e => e.key === "Enter" && handleSaveEdit()}
+          />
+          <Input
+            data-testid={`input-edit-link-icon-${link.id}`}
+            value={editIcon}
+            onChange={e => setEditIcon(e.target.value)}
+            className="h-9 text-sm w-14 text-center px-1"
+            placeholder="🏷️"
+            maxLength={8}
+          />
+          <button
+            onClick={handleSaveEdit}
+            disabled={!editTitle.trim() || !editUrl.trim()}
+            className="w-9 h-9 rounded-lg flex items-center justify-center text-green-500
+              hover:bg-green-500/15 transition-colors flex-shrink-0"
+            aria-label="Save"
+          ><Check size={14} /></button>
+          <button
+            onClick={() => { setEditing(false); setEditTitle(link.title); setEditUrl(link.url); setEditIcon(link.icon ?? ""); }}
+            className="w-9 h-9 rounded-lg flex items-center justify-center text-muted-foreground
+              hover:bg-secondary transition-colors flex-shrink-0"
+            aria-label="Cancel"
+          ><X size={14} /></button>
+        </div>
+      </div>
+    );
+  }
+
+  // Normal display mode
   return (
     <div
       data-testid={`row-link-${link.id}`}
       className="flex items-center gap-3 px-3 py-3 rounded-xl border border-border bg-card
         active:bg-secondary/40 transition-all duration-100"
+      style={locked ? { borderColor: "hsl(var(--border))", opacity: 0.85 } : {}}
     >
       {/* Favicon */}
       <div className="w-8 h-8 rounded-lg overflow-hidden flex-shrink-0 flex items-center justify-center bg-secondary">
@@ -116,6 +196,7 @@ function LinkRow({ link, onDelete }: { link: Link; onDelete: (id: number) => voi
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-1.5 min-w-0 flex-wrap">
           {link.icon && <IconBadge icon={link.icon} />}
+          {locked && <Lock size={10} className="text-amber-500 flex-shrink-0" />}
           <p className="text-sm font-semibold text-foreground truncate leading-tight">{link.title}</p>
         </div>
         <p className="text-[11px] text-muted-foreground truncate mt-0.5">{prettyHost(link.url)}</p>
@@ -134,20 +215,60 @@ function LinkRow({ link, onDelete }: { link: Link; onDelete: (id: number) => voi
         </span>
       )}
 
-      {/* Actions — always visible (no hover-only on mobile) */}
+      {/* Actions */}
       <div className="flex items-center gap-1 flex-shrink-0">
-        <a
-          href={href}
-          target="_blank"
-          rel="noopener noreferrer"
-          data-testid={`button-link-open-${link.id}`}
+        {/* Edit */}
+        <button
+          data-testid={`button-link-edit-${link.id}`}
+          onClick={() => setEditing(true)}
           className="w-9 h-9 rounded-lg flex items-center justify-center text-muted-foreground
             hover:bg-secondary hover:text-foreground active:bg-secondary transition-colors"
-          aria-label="Open link"
-          onClick={e => e.stopPropagation()}
+          aria-label="Edit link"
         >
-          <ExternalLink size={15} />
-        </a>
+          <Pencil size={13} />
+        </button>
+
+        {/* Lock toggle */}
+        <button
+          data-testid={`button-link-lock-${link.id}`}
+          onClick={handleToggleLock}
+          className="w-9 h-9 rounded-lg flex items-center justify-center transition-colors"
+          style={locked
+            ? { color: "#f59e0b", background: "#f59e0b18" }
+            : { color: "hsl(var(--muted-foreground))" }
+          }
+          title={locked ? "Locked — click to unlock" : "Click to lock"}
+          aria-label={locked ? "Unlock link" : "Lock link"}
+        >
+          {locked ? <Lock size={13} /> : <LockOpen size={13} />}
+        </button>
+
+        {/* Open in new tab — blocked when locked */}
+        {locked ? (
+          <button
+            data-testid={`button-link-open-${link.id}`}
+            onClick={() => toast({ title: "This link is locked 🔒", description: "Unlock it first to open." })}
+            className="w-9 h-9 rounded-lg flex items-center justify-center text-amber-500/60 cursor-not-allowed"
+            aria-label="Link is locked"
+          >
+            <Lock size={15} />
+          </button>
+        ) : (
+          <a
+            href={href}
+            target="_blank"
+            rel="noopener noreferrer"
+            data-testid={`button-link-open-${link.id}`}
+            className="w-9 h-9 rounded-lg flex items-center justify-center text-muted-foreground
+              hover:bg-secondary hover:text-foreground active:bg-secondary transition-colors"
+            aria-label="Open link"
+            onClick={e => e.stopPropagation()}
+          >
+            <ExternalLink size={15} />
+          </a>
+        )}
+
+        {/* Delete */}
         <button
           data-testid={`button-link-delete-${link.id}`}
           onClick={() => onDelete(link.id)}
@@ -319,6 +440,19 @@ function LinksPanel({
     },
   });
 
+  const updateMutation = useMutation({
+    mutationFn: ({ id, data }: { id: number; data: object }) => apiRequest("PATCH", `/api/links/${id}`, data),
+    onSuccess: async (res) => {
+      const updated: Link = await res.json();
+      qc.setQueryData(linksKey, (old: Link[] = []) => old.map(l => l.id === updated.id ? updated : l));
+    },
+    onError: () => toast({ title: "Failed to update link", variant: "destructive" }),
+  });
+
+  function handleUpdateLink(id: number, data: Partial<{ title: string; url: string; icon: string | null; locked: number }>) {
+    updateMutation.mutate({ id, data });
+  }
+
   const sorted = useMemo(() => {
     const copy = [...links];
     if (linkSort === "asc") copy.sort((a, b) => a.title.localeCompare(b.title));
@@ -381,6 +515,7 @@ function LinksPanel({
             key={link.id}
             link={link}
             onDelete={id => deleteMutation.mutate(id)}
+            onUpdate={handleUpdateLink}
           />
         ))}
       </div>
