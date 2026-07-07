@@ -142,6 +142,17 @@ try { sqlite.exec(`ALTER TABLE links ADD COLUMN list_id INTEGER NOT NULL DEFAULT
 try { sqlite.exec(`ALTER TABLE link_lists ADD COLUMN emoji TEXT`); } catch {}
 try { sqlite.exec(`ALTER TABLE links ADD COLUMN icon TEXT`); } catch {}
 try { sqlite.exec(`ALTER TABLE links ADD COLUMN locked INTEGER NOT NULL DEFAULT 0`); } catch {}
+// Migrate profiles table — new diary + visual fields
+try { sqlite.exec(`ALTER TABLE profiles ADD COLUMN diary_entry TEXT`); } catch {}
+try { sqlite.exec(`ALTER TABLE profiles ADD COLUMN unpopular_opinion TEXT`); } catch {}
+try { sqlite.exec(`ALTER TABLE profiles ADD COLUMN vibe_tags TEXT`); } catch {}
+try { sqlite.exec(`ALTER TABLE profiles ADD COLUMN top_3 TEXT`); } catch {}
+try { sqlite.exec(`ALTER TABLE profiles ADD COLUMN avatar_url TEXT`); } catch {}
+try { sqlite.exec(`ALTER TABLE profiles ADD COLUMN bg_style TEXT`); } catch {}
+try { sqlite.exec(`ALTER TABLE profiles ADD COLUMN bg_custom TEXT`); } catch {}
+try { sqlite.exec(`ALTER TABLE profiles ADD COLUMN banner_pattern TEXT`); } catch {}
+try { sqlite.exec(`ALTER TABLE profiles ADD COLUMN profile_music_url TEXT`); } catch {}
+try { sqlite.exec(`ALTER TABLE profiles ADD COLUMN profile_music_label TEXT`); } catch {}
 // Migrate restaurants table
 try { sqlite.exec(`CREATE TABLE IF NOT EXISTS restaurants (
   id INTEGER PRIMARY KEY AUTOINCREMENT,

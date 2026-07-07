@@ -29,6 +29,18 @@ export const profiles = sqliteTable("profiles", {
   customStat1Value: text("custom_stat1_value"),
   customStat2Label: text("custom_stat2_label"),
   customStat2Value: text("custom_stat2_value"),
+  // Diary & personality
+  diaryEntry: text("diary_entry"),              // freeform diary text shown on profile
+  unpopularOpinion: text("unpopular_opinion"),  // hot take shown as sealed diary entry
+  vibeTags: text("vibe_tags"),                  // JSON array of tags e.g. ["night owl","weeb"]
+  top3: text("top_3"),                          // JSON array [{title,type,emoji}] — pinned top picks
+  // Visual customisation
+  avatarUrl: text("avatar_url"),                // custom image URL for avatar
+  bgStyle: text("bg_style"),                    // "aurora" | "waves" | "noise" | "mesh" | "stars" | "solid" | "custom"
+  bgCustom: text("bg_custom"),                  // raw CSS gradient string when bgStyle=custom
+  bannerPattern: text("banner_pattern"),        // optional overlay texture
+  profileMusicUrl: text("profile_music_url"),   // spotify/yt link shown on profile
+  profileMusicLabel: text("profile_music_label"), // display label for music link
 });
 
 export const insertProfileSchema = createInsertSchema(profiles).omit({ id: true });

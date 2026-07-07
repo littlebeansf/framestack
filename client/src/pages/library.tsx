@@ -23,7 +23,7 @@ import {
 } from "@/components/ui/sheet";
 
 const TYPE_LABELS: Record<string, string> = {
-  anime: "Anime", manga: "Manga", movie: "Movie", series: "Series", book: "Book",
+  anime: "Anime", manga: "Manga", movie: "Movie", series: "Series", book: "Book", podcast: "Podcast",
 };
 
 function SkeletonCard() {
