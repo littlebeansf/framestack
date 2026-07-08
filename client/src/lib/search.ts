@@ -2,7 +2,7 @@
 // This avoids CORS issues and rate limiting on the published pplx.app domain.
 // Falls back to direct browser calls if the backend is unreachable (GitHub Pages).
 
-import { API_BASE } from "./queryClient";
+import { API_BASE, getAuthToken } from "./queryClient";
 
 export interface SearchResult {
   externalId: string;
@@ -22,7 +22,10 @@ export interface SearchResult {
 async function searchViaBackend(q: string, type: string): Promise<SearchResult[] | null> {
   try {
     const url = `${API_BASE}/api/search/${type}?q=${encodeURIComponent(q)}`;
-    const r = await fetch(url, { signal: AbortSignal.timeout(8000) });
+    const token = getAuthToken();
+    const headers: Record<string, string> = {};
+    if (token) headers["x-auth-token"] = token;
+    const r = await fetch(url, { headers, signal: AbortSignal.timeout(8000) });
     if (!r.ok) return null;
     return await r.json();
   } catch {
