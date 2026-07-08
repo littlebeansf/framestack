@@ -189,9 +189,11 @@ try { sqlite.exec(`CREATE TABLE IF NOT EXISTS grocery_lists (
   name TEXT NOT NULL,
   date TEXT NOT NULL,
   is_template INTEGER NOT NULL DEFAULT 0,
+  is_completed INTEGER NOT NULL DEFAULT 0,
   created_by TEXT NOT NULL,
   created_at TEXT NOT NULL DEFAULT ''
 )`); } catch {}
+try { sqlite.exec(`ALTER TABLE grocery_lists ADD COLUMN is_completed INTEGER NOT NULL DEFAULT 0`); } catch {}
 try { sqlite.exec(`CREATE TABLE IF NOT EXISTS grocery_items (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   list_id INTEGER NOT NULL,
@@ -735,6 +737,63 @@ export class Storage implements IStorage {
     return db.insert(dailyMoods)
       .values({ owner, date, mood, note: note ?? null, createdAt: Date.now() })
       .returning().get()!;
+  }
+
+  // ── Grocery Lists ──────────────────────────────────────────────────────
+  getGroceryLists(includeTemplates = true) {
+    return db.select().from(groceryLists)
+      .orderBy(desc(groceryLists.date))
+      .all()
+      .filter(l => includeTemplates ? true : !l.is_template);
+  }
+  getGroceryList(id: number) {
+    return db.select().from(groceryLists).where(eq(groceryLists.id, id)).get();
+  }
+  createGroceryList(data: Omit<InsertGroceryList, 'created_at'>) {
+    return db.insert(groceryLists)
+      .values({ ...data, is_completed: 0, created_at: new Date().toISOString() })
+      .returning().get()!;
+  }
+  updateGroceryList(id: number, data: Partial<InsertGroceryList>) {
+    return db.update(groceryLists).set(data).where(eq(groceryLists.id, id)).returning().get();
+  }
+  deleteGroceryList(id: number) {
+    db.delete(groceryItems).where(eq(groceryItems.list_id, id)).run();
+    db.delete(groceryLists).where(eq(groceryLists.id, id)).run();
+  }
+
+  // ── Grocery Items ──────────────────────────────────────────────────────
+  getGroceryItems(listId: number) {
+    return db.select().from(groceryItems)
+      .where(eq(groceryItems.list_id, listId))
+      .orderBy(groceryItems.sort_order)
+      .all();
+  }
+  createGroceryItem(data: InsertGroceryItem) {
+    return db.insert(groceryItems).values(data).returning().get()!;
+  }
+  updateGroceryItem(id: number, data: Partial<InsertGroceryItem>) {
+    return db.update(groceryItems).set(data).where(eq(groceryItems.id, id)).returning().get();
+  }
+  deleteGroceryItem(id: number) {
+    db.delete(groceryItems).where(eq(groceryItems.id, id)).run();
+  }
+  cloneListFromTemplate(templateId: number, date: string, name: string, createdBy: string) {
+    const tmpl = this.getGroceryList(templateId);
+    if (!tmpl) throw new Error("Template not found");
+    const newList = this.createGroceryList({ name, date, is_template: 0, is_completed: 0, created_by: createdBy });
+    const items = this.getGroceryItems(templateId);
+    items.forEach((item, idx) => {
+      this.createGroceryItem({
+        list_id: newList.id,
+        name: item.name,
+        location: item.location ?? null,
+        price: item.price ?? null,
+        checked: 0,
+        sort_order: idx,
+      });
+    });
+    return newList;
   }
 }
 

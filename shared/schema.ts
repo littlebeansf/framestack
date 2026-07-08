@@ -342,12 +342,13 @@ export const DEFAULT_COLLECTIONS: Array<{
 // ── Grocery Lists ────────────────────────────────────────────────────────────
 
 export const groceryLists = sqliteTable("grocery_lists", {
-  id:          integer("id").primaryKey({ autoIncrement: true }),
-  name:        text("name").notNull(),
-  date:        text("date").notNull(),          // ISO date string YYYY-MM-DD
-  is_template: integer("is_template").notNull().default(0),  // 0=list, 1=template
-  created_by:  text("created_by").notNull(),    // "jack" | "sally"
-  created_at:  text("created_at").notNull().default(""),
+  id:           integer("id").primaryKey({ autoIncrement: true }),
+  name:         text("name").notNull(),
+  date:         text("date").notNull(),          // ISO date string YYYY-MM-DD
+  is_template:  integer("is_template").notNull().default(0),   // 0=list, 1=template
+  is_completed: integer("is_completed").notNull().default(0),  // 0=active, 1=archived
+  created_by:   text("created_by").notNull(),    // "jack" | "sally"
+  created_at:   text("created_at").notNull().default(""),
 });
 
 export const groceryItems = sqliteTable("grocery_items", {

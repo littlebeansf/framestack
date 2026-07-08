@@ -431,11 +431,15 @@ function MoodPicker({ onSelect, onClose, currentMood }: {
 
 // ── Jack Creature (ghost skull) ────────────────────────────────────────────────
 
-function JackCreature({ mood, animClass, onClick }: {
+function JackCreature({ mood, animClass, onClick, eyeOffset = { x: 0, y: 0 } }: {
   mood: MoodKey; animClass: string; onClick: () => void;
+  eyeOffset?: { x: number; y: number };
 }) {
   const def = getMoodDef(mood);
   const c = def.color;
+  // Eye tracking: offset for pupils (clamped to ±1.8)
+  const px = eyeOffset.x * 1.8;
+  const py = eyeOffset.y * 1.4;
 
   const eyes = {
     happy:   { l: "M-7,-2 Q-5,-5 -3,-2",   r: "M3,-2 Q5,-5 7,-2" },
@@ -535,6 +539,13 @@ function JackCreature({ mood, animClass, onClick }: {
         />
         <g>{renderEye("l")}</g>
         <g>{renderEye("r")}</g>
+        {/* Tracking pupils — only on moods that have visible eyes */}
+        {![ "tired", "numb" ].includes(mood) && (
+          <>
+            <circle cx={-5 + px} cy={-3 + py} r="1.5" fill={c} opacity="0.7" />
+            <circle cx={ 5 + px} cy={-3 + py} r="1.5" fill={c} opacity="0.7" />
+          </>
+        )}
         {mouths[mood]}
         <circle className="fc-jack-wisp1" cx="-28" cy="-18" r="3" fill={`${c}55`} />
         <circle className="fc-jack-wisp2" cx="30"  cy="-22" r="2" fill={`${c}44`} />
@@ -548,20 +559,25 @@ function JackCreature({ mood, animClass, onClick }: {
 
 // ── Sally Creature (chibi fox) ────────────────────────────────────────────────
 
-function SallyCreature({ mood, animClass, onClick }: {
+function SallyCreature({ mood, animClass, onClick, eyeOffset = { x: 0, y: 0 } }: {
   mood: MoodKey; animClass: string; onClick: () => void;
+  eyeOffset?: { x: number; y: number };
 }) {
   const def = getMoodDef(mood);
   const c = def.color;
+  // Eye tracking offset (clamped ±1.5)
+  const px = eyeOffset.x * 1.5;
+  const py = eyeOffset.y * 1.2;
 
   function Eye({ cx, mood: m }: { cx: number; mood: MoodKey }) {
     const base = (
       <>
         <ellipse cx={cx} cy={-8} rx={4.5} ry={4.5} fill="rgba(255,255,255,0.92)" />
         <ellipse cx={cx} cy={-7} rx={2.8} ry={3.2} fill={c} />
-        <circle  cx={cx} cy={-8} r={1.5}  fill="rgba(0,0,0,0.7)" />
-        <circle  cx={cx + 1.2} cy={-9} r={0.9} fill="rgba(255,255,255,0.9)" />
-        <circle  cx={cx - 0.8} cy={-7.5} r={0.45} fill="rgba(255,255,255,0.7)" />
+        {/* Iris + pupil shift with cursor */}
+        <circle  cx={cx + px} cy={-8 + py} r={1.5}  fill="rgba(0,0,0,0.7)" />
+        <circle  cx={cx + px + 0.7} cy={-9 + py} r={0.9} fill="rgba(255,255,255,0.9)" />
+        <circle  cx={cx + px - 0.5} cy={-7.5 + py} r={0.45} fill="rgba(255,255,255,0.7)" />
       </>
     );
     if (m === "happy") return (
@@ -750,6 +766,7 @@ function CompanionPanel({
   onCreatureClick,
   onMoodChange,
   feralHop = null,
+  eyeOffset = { x: 0, y: 0 },
 }: {
   owner: "jack" | "sally";
   speech: string;
@@ -757,6 +774,7 @@ function CompanionPanel({
   onCreatureClick: () => void;
   onMoodChange: (k: MoodKey) => void;
   feralHop?: "jack" | "sally" | null;
+  eyeOffset?: { x: number; y: number };
 }) {
   const today = todayISO();
   const moodKey = ["/api/mood", owner, today];
@@ -889,8 +907,8 @@ function CompanionPanel({
       >
         <MiniParticles particles={particles} active={particlesActive} color={def.color} />
         {owner === "jack"
-          ? <JackCreature mood={currentMood} animClass={animClass} onClick={handleClick} />
-          : <SallyCreature mood={currentMood} animClass={animClass} onClick={handleClick} />
+          ? <JackCreature mood={currentMood} animClass={animClass} onClick={handleClick} eyeOffset={eyeOffset} />
+          : <SallyCreature mood={currentMood} animClass={animClass} onClick={handleClick} eyeOffset={eyeOffset} />
         }
       </div>
 
@@ -1594,6 +1612,36 @@ export default function FloatingCompanions() {
   const jackMoodRef  = useRef<MoodKey>("happy");
   const sallyMoodRef = useRef<MoodKey>("happy");
 
+  // Eye cursor tracking — compute offset relative to each creature's center
+  const [eyeOffset, setEyeOffset] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
+  const widgetRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function onMouseMove(e: MouseEvent) {
+      // Use the widget bounding box center as reference
+      const el = widgetRef.current;
+      if (!el) return;
+      const r = el.getBoundingClientRect();
+      // Distance from widget center
+      const dx = e.clientX - (r.left + r.width  / 2);
+      const dy = e.clientY - (r.top  + r.height / 2);
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      // Only track when cursor is within 300px of the widget
+      if (dist > 300) {
+        setEyeOffset({ x: 0, y: 0 });
+        return;
+      }
+      // Normalise to ±1
+      const maxD = 300;
+      setEyeOffset({
+        x: Math.max(-1, Math.min(1, (dx / maxD) * 2)),
+        y: Math.max(-1, Math.min(1, (dy / maxD) * 2)),
+      });
+    }
+    window.addEventListener("mousemove", onMouseMove);
+    return () => window.removeEventListener("mousemove", onMouseMove);
+  }, []);
+
   const bothSameMood = jackMood === sallyMood;
   const sharedMood   = jackMood; // same as sallyMood when bothSameMood
   const bothHorny    = jackMood === "horny"  && sallyMood === "horny";
@@ -1662,6 +1710,7 @@ export default function FloatingCompanions() {
 
   return (
     <div
+      ref={widgetRef}
       className="hidden md:block"
       style={{ ...cornerStyle(corner), pointerEvents: "none" }}
     >
@@ -1756,6 +1805,7 @@ export default function FloatingCompanions() {
             onCreatureClick={handleJackClick}
             onMoodChange={(k) => { jackMoodRef.current = k; setJackMood(k); }}
             feralHop={bothFeral ? "jack" : null}
+            eyeOffset={eyeOffset}
           />
         </div>
 
@@ -1799,6 +1849,7 @@ export default function FloatingCompanions() {
             onCreatureClick={handleSallyClick}
             onMoodChange={(k) => { sallyMoodRef.current = k; setSallyMood(k); }}
             feralHop={bothFeral ? "sally" : null}
+            eyeOffset={eyeOffset}
           />
         </div>
       </div>

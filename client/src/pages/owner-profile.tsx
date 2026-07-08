@@ -765,6 +765,72 @@ function EditProfileDialog({
   );
 }
 
+// ── Avatar tilt card ────────────────────────────────────────────────────────────
+
+function AvatarTilt({ accent, banner, avatarUrl, emoji }: {
+  accent: string; banner: string; avatarUrl: string; emoji: string;
+}) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [tilt, setTilt] = useState({ rx: 0, ry: 0, glow: false });
+
+  function handleMove(e: React.MouseEvent<HTMLDivElement>) {
+    const el = ref.current;
+    if (!el) return;
+    const r = el.getBoundingClientRect();
+    const x = ((e.clientX - r.left) / r.width  - 0.5) * 2;  // -1 to 1
+    const y = ((e.clientY - r.top)  / r.height - 0.5) * 2;
+    setTilt({ rx: -y * 18, ry: x * 18, glow: true });
+  }
+
+  function handleLeave() {
+    setTilt({ rx: 0, ry: 0, glow: false });
+  }
+
+  return (
+    <div
+      ref={ref}
+      onMouseMove={handleMove}
+      onMouseLeave={handleLeave}
+      className="w-24 h-24 rounded-2xl shrink-0 overflow-hidden border-2 shadow-2xl select-none flex items-center justify-center"
+      style={{
+        borderColor: `${accent}${tilt.glow ? "cc" : "55"}`,
+        background: banner,
+        cursor: "default",
+        transition: "box-shadow 0.2s, border-color 0.2s",
+        boxShadow: tilt.glow
+          ? `0 0 60px ${accent}99, 0 8px 32px #0009, inset 0 0 12px ${accent}33`
+          : `0 0 40px ${accent}55`,
+        transform: `perspective(400px) rotateX(${tilt.rx}deg) rotateY(${tilt.ry}deg) scale(${tilt.glow ? 1.08 : 1})`,
+        transformStyle: "preserve-3d",
+        willChange: "transform",
+      }}
+    >
+      {/* Shine overlay */}
+      {tilt.glow && (
+        <div
+          className="absolute inset-0 pointer-events-none rounded-2xl z-10"
+          style={{
+            background: `radial-gradient(
+              ellipse at ${
+                50 + tilt.ry * 2
+              }% ${
+                50 - tilt.rx * 2
+              }%,
+              ${accent}44 0%,
+              transparent 70%
+            )`,
+          }}
+        />
+      )}
+      {avatarUrl ? (
+        <img src={avatarUrl} alt="" className="w-full h-full object-cover" onError={e => { (e.target as any).style.display = "none"; }} />
+      ) : (
+        <span className="text-5xl leading-none">{emoji}</span>
+      )}
+    </div>
+  );
+}
+
 // ── Main profile page ─────────────────────────────────────────────────────────
 
 export default function OwnerProfilePage({ owner }: { owner: string }) {
@@ -857,17 +923,8 @@ export default function OwnerProfilePage({ owner }: { owner: string }) {
         {/* Content */}
         <div className="relative z-10 p-6 pt-8 flex flex-col sm:flex-row items-start sm:items-end gap-5">
 
-          {/* Avatar */}
-          <div
-            className="w-24 h-24 rounded-2xl shrink-0 overflow-hidden border-2 shadow-2xl emoji-pop cursor-default select-none flex items-center justify-center"
-            style={{ borderColor: `${accent}55`, boxShadow: `0 0 40px ${accent}55`, background: banner }}
-          >
-            {avatarUrl ? (
-              <img src={avatarUrl} alt="" className="w-full h-full object-cover" onError={e => { (e.target as any).style.display = "none"; }} />
-            ) : (
-              <span className="text-5xl leading-none">{profile.avatarEmoji || "🐻"}</span>
-            )}
-          </div>
+          {/* Avatar — tilt-on-hover */}
+          <AvatarTilt accent={accent} banner={banner} avatarUrl={avatarUrl} emoji={profile.avatarEmoji || "🐻"} />
 
           {/* Name area */}
           <div className="flex-1 min-w-0">
