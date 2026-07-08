@@ -958,6 +958,126 @@ const SYNC_EFFECTS: Record<MoodKey, { particles: string[]; label: string; color:
   numb:    { particles: ["🩶","…","·"],   label: "…",             color: "#6b7280" },
 };
 
+
+// ── Make Love animation — shown when both are on "horny" ─────────────────────
+
+const HORNY_LABELS = [
+  "( ͡° ͜ʖ ͡°)", "oh my—", "getting hot…", "finally!!",
+  "it's happening", "👀👀👀", "no thoughts", "🌶️🌶️🌶️",
+];
+
+function MakeLoveAnimation() {
+  const [labelIdx, setLabelIdx] = useState(0);
+
+  // Cycle label every 2s
+  useEffect(() => {
+    const id = setInterval(() => {
+      setLabelIdx(i => (i + 1) % HORNY_LABELS.length);
+    }, 2000);
+    return () => clearInterval(id);
+  }, []);
+
+  return (
+    <div
+      className="absolute pointer-events-none select-none overflow-visible"
+      style={{ zIndex: 35, left: "50%", bottom: 8, transform: "translateX(-50%)" }}
+    >
+      <style>{`
+        /* Central heart beat */
+        @keyframes ml-heartbeat {
+          0%,100%{ transform: scale(1);   opacity: 0.9; }
+          15%    { transform: scale(1.45); opacity: 1;   }
+          30%    { transform: scale(1.1);  opacity: 0.95;}
+          50%    { transform: scale(1.35); opacity: 1;   }
+        }
+        /* Orbiting hearts */
+        @keyframes ml-orbit-0 { 0%{ transform: rotate(0deg)   translateX(18px) scale(0.7); opacity:0.8 } 100%{ transform: rotate(360deg)  translateX(18px) scale(0.7); opacity:0.8 } }
+        @keyframes ml-orbit-1 { 0%{ transform: rotate(120deg) translateX(18px) scale(0.6); opacity:0.7 } 100%{ transform: rotate(480deg)  translateX(18px) scale(0.6); opacity:0.7 } }
+        @keyframes ml-orbit-2 { 0%{ transform: rotate(240deg) translateX(18px) scale(0.5); opacity:0.6 } 100%{ transform: rotate(600deg)  translateX(18px) scale(0.5); opacity:0.6 } }
+        /* Steam puffs rising */
+        @keyframes ml-steam-0 { 0%{transform:translateY(0) translateX(-10px) scale(0.4);opacity:0} 30%{opacity:0.7} 100%{transform:translateY(-70px) translateX(-18px) scale(1.1);opacity:0} }
+        @keyframes ml-steam-1 { 0%{transform:translateY(0) translateX(6px)  scale(0.3);opacity:0} 30%{opacity:0.8} 100%{transform:translateY(-65px) translateX(14px)  scale(1);opacity:0}   }
+        @keyframes ml-steam-2 { 0%{transform:translateY(0) translateX(-4px) scale(0.5);opacity:0} 30%{opacity:0.6} 100%{transform:translateY(-75px) translateX(8px)   scale(0.9);opacity:0} }
+        @keyframes ml-steam-3 { 0%{transform:translateY(0) translateX(12px) scale(0.3);opacity:0} 30%{opacity:0.7} 100%{transform:translateY(-60px) translateX(-6px)  scale(1.2);opacity:0} }
+        /* Spark zigzag */
+        @keyframes ml-spark-l { 0%{transform:translateX(0)  translateY(0);opacity:1} 100%{transform:translateX(-22px) translateY(-16px);opacity:0} }
+        @keyframes ml-spark-r { 0%{transform:translateX(0)  translateY(0);opacity:1} 100%{transform:translateX(22px)  translateY(-14px);opacity:0} }
+        /* Label pulse */
+        @keyframes ml-label   { 0%,100%{opacity:0.6;transform:translateX(-50%) scale(0.95)} 50%{opacity:1;transform:translateX(-50%) scale(1.05)} }
+        /* Whole widget subtle wiggle */
+        @keyframes ml-wiggle  { 0%,100%{transform:translateX(-50%) rotate(-1deg)} 50%{transform:translateX(-50%) rotate(1deg)} }
+      `}</style>
+
+      {/* Wiggle wrapper */}
+      <div style={{ animation: "ml-wiggle 0.9s ease-in-out infinite", transformOrigin: "center bottom" }}>
+
+        {/* Central beating heart */}
+        <div style={{ position: "relative", width: 0, height: 0, display: "flex", justifyContent: "center" }}>
+          <div style={{
+            position: "absolute", bottom: 12,
+            fontSize: 28, lineHeight: 1,
+            animation: "ml-heartbeat 0.7s ease-in-out infinite",
+            filter: "drop-shadow(0 0 10px #ff4d6d) drop-shadow(0 0 20px #ff4d6daa)",
+          }}>
+            💖
+          </div>
+
+          {/* 3 orbiting mini hearts */}
+          {[0,1,2].map(i => (
+            <div key={i} style={{
+              position: "absolute", bottom: 22,
+              fontSize: 12, lineHeight: 1,
+              animation: `ml-orbit-${i} ${2.4 + i*0.3}s linear infinite`,
+              transformOrigin: "0 0",
+            }}>
+              ♡
+            </div>
+          ))}
+
+          {/* Steam puffs */}
+          {["💨","☁️","💨","☁️"].map((e, i) => (
+            <div key={i} style={{
+              position: "absolute", bottom: 8, left: 0,
+              fontSize: 14,
+              animation: `ml-steam-${i} ${2.8 + i*0.4}s ${i*0.6}s ease-out infinite`,
+              filter: "drop-shadow(0 0 4px #ff4d6d88)",
+            }}>
+              {e}
+            </div>
+          ))}
+
+          {/* Left + right sparks */}
+          <div style={{
+            position: "absolute", bottom: 18, left: 0,
+            fontSize: 13,
+            animation: "ml-spark-l 0.8s 0s ease-out infinite",
+          }}>✦</div>
+          <div style={{
+            position: "absolute", bottom: 20, left: 0,
+            fontSize: 10,
+            animation: "ml-spark-r 0.8s 0.4s ease-out infinite",
+          }}>✦</div>
+        </div>
+      </div>
+
+      {/* Cycling spicy label */}
+      <div style={{
+        position: "absolute",
+        bottom: 88,
+        left: "50%",
+        whiteSpace: "nowrap",
+        fontSize: 10,
+        fontWeight: 700,
+        color: "#ff4d6d",
+        textShadow: "0 0 8px #ff4d6daa",
+        animation: "ml-label 2s ease-in-out infinite",
+      }}>
+        {HORNY_LABELS[labelIdx]}
+      </div>
+    </div>
+  );
+}
+
 function SyncEffect({ mood }: { mood: MoodKey }) {
   const { particles, label, color } = SYNC_EFFECTS[mood];
   // 6 floating particles, staggered, looping up between the two creatures
@@ -1052,6 +1172,7 @@ export default function FloatingCompanions() {
 
   const bothSameMood = jackMood === sallyMood;
   const sharedMood   = jackMood; // same as sallyMood when bothSameMood
+  const bothHorny    = jackMood === "horny" && sallyMood === "horny";
 
   const isBottom = corner.startsWith("bottom");
   const isRight  = corner.endsWith("right");
@@ -1182,27 +1303,42 @@ export default function FloatingCompanions() {
         </div>
 
         {/* Jack */}
-        <CompanionPanel
-          owner="jack"
-          speech={jackSpeech}
-          bubbleSide={jackBubble}
-          onCreatureClick={handleJackClick}
-          onMoodChange={(k) => { jackMoodRef.current = k; setJackMood(k); }}
-        />
+        <div style={{
+          transform: bothHorny ? (isRight ? "rotate(8deg) translateX(6px)" : "rotate(-8deg) translateX(-6px)") : "none",
+          transition: "transform 0.8s cubic-bezier(0.34,1.56,0.64,1)",
+          transformOrigin: "bottom center",
+        }}>
+          <CompanionPanel
+            owner="jack"
+            speech={jackSpeech}
+            bubbleSide={jackBubble}
+            onCreatureClick={handleJackClick}
+            onMoodChange={(k) => { jackMoodRef.current = k; setJackMood(k); }}
+          />
+        </div>
 
-        {/* Center — sync effect */}
+        {/* Center — sync effect or make love animation */}
         <div className="relative self-stretch" style={{ width: 8 }}>
-          {bothSameMood && <SyncEffect mood={sharedMood} />}
+          {bothSameMood && sharedMood === "horny"
+            ? <MakeLoveAnimation />
+            : bothSameMood && <SyncEffect mood={sharedMood} />
+          }
         </div>
 
         {/* Sally */}
-        <CompanionPanel
-          owner="sally"
-          speech={sallySpeech}
-          bubbleSide={sallyBubble}
-          onCreatureClick={handleSallyClick}
-          onMoodChange={(k) => { sallyMoodRef.current = k; setSallyMood(k); }}
-        />
+        <div style={{
+          transform: bothHorny ? (isRight ? "rotate(-8deg) translateX(-6px)" : "rotate(8deg) translateX(6px)") : "none",
+          transition: "transform 0.8s cubic-bezier(0.34,1.56,0.64,1)",
+          transformOrigin: "bottom center",
+        }}>
+          <CompanionPanel
+            owner="sally"
+            speech={sallySpeech}
+            bubbleSide={sallyBubble}
+            onCreatureClick={handleSallyClick}
+            onMoodChange={(k) => { sallyMoodRef.current = k; setSallyMood(k); }}
+          />
+        </div>
       </div>
     </div>
   );
