@@ -966,6 +966,144 @@ const HORNY_LABELS = [
   "it's happening", "👀👀👀", "no thoughts", "🌶️🌶️🌶️",
 ];
 
+
+// ── Go Feral animation — shown when both are on "feral" ──────────────────────
+// Absolute chaos: both hop around wildly, spinning emojis, lightning, howls.
+
+const FERAL_LABELS = [
+  "AAAAAAA", "NO THOUGHTS", "FERAL MODE", "👁️👁️", "IT'S OVER",
+  "BESTIAL", "UNALIVED", "SEND HELP", "🐺🐺🐺", "CANNOT BE STOPPED",
+];
+
+function GoFeralAnimation() {
+  const [labelIdx, setLabelIdx] = useState(0);
+
+  useEffect(() => {
+    const id = setInterval(() => {
+      setLabelIdx(i => (i + 1) % FERAL_LABELS.length);
+    }, 700); // fast cycling for chaos
+    return () => clearInterval(id);
+  }, []);
+
+  return (
+    <div
+      className="absolute pointer-events-none select-none overflow-visible"
+      style={{ zIndex: 35, left: "50%", bottom: 0, transform: "translateX(-50%)" }}
+    >
+      <style>{`
+        /* Bouncing emojis criss-crossing */
+        @keyframes fc-feral-cross-l { 0%{transform:translateX(0) translateY(0) rotate(0deg);opacity:1} 40%{transform:translateX(-32px) translateY(-44px) rotate(-180deg);opacity:1} 70%{transform:translateX(20px) translateY(-28px) rotate(-260deg);opacity:0.7} 100%{transform:translateX(-10px) translateY(-60px) rotate(-360deg);opacity:0} }
+        @keyframes fc-feral-cross-r { 0%{transform:translateX(0) translateY(0) rotate(0deg);opacity:1} 40%{transform:translateX(32px) translateY(-38px) rotate(180deg);opacity:1}  70%{transform:translateX(-14px) translateY(-52px) rotate(260deg);opacity:0.7} 100%{transform:translateX(12px) translateY(-66px) rotate(360deg);opacity:0} }
+        @keyframes fc-feral-cross-m { 0%{transform:translateX(0) translateY(0) rotate(0deg);opacity:0.9} 50%{transform:translateX(-8px) translateY(-50px) rotate(-200deg);opacity:1} 100%{transform:translateX(6px) translateY(-72px) rotate(-400deg);opacity:0} }
+        /* Question marks raining down */
+        @keyframes fc-feral-q { 0%{transform:translateY(-60px) translateX(0) rotate(0deg);opacity:0} 20%{opacity:1} 100%{transform:translateY(0px) translateX(var(--dx)) rotate(var(--dr));opacity:0} }
+        /* Central spinning vortex */
+        @keyframes fc-feral-vortex { 0%{transform:rotate(0deg) scale(1)} 50%{transform:rotate(180deg) scale(1.3)} 100%{transform:rotate(360deg) scale(1)} }
+        /* Shockwave ring */
+        @keyframes fc-feral-ring { 0%{transform:scale(0.2);opacity:0.8;border-width:3px} 100%{transform:scale(2.8);opacity:0;border-width:0px} }
+        /* Label flicker */
+        @keyframes fc-feral-label { 0%,49%{opacity:1} 50%,100%{opacity:0.3} }
+        /* Lightning bolt stabs */
+        @keyframes fc-feral-bolt-l { 0%{transform:translateX(0) translateY(0) rotate(-30deg);opacity:1} 100%{transform:translateX(-24px) translateY(-30px) rotate(-60deg);opacity:0} }
+        @keyframes fc-feral-bolt-r { 0%{transform:translateX(0) translateY(0) rotate(30deg);opacity:1}  100%{transform:translateX(24px)  translateY(-28px) rotate(60deg);opacity:0} }
+      `}</style>
+
+      {/* Shockwave rings */}
+      {[0, 1].map(i => (
+        <div key={i} style={{
+          position: "absolute", left: "50%", bottom: 16,
+          width: 20, height: 20,
+          marginLeft: -10,
+          borderRadius: "50%",
+          border: "3px solid #a855f7",
+          animation: `fc-feral-ring 1.1s ${i * 0.55}s ease-out infinite`,
+          boxShadow: "0 0 8px #a855f7",
+        }} />
+      ))}
+
+      {/* Central spinning vortex emoji */}
+      <div style={{
+        position: "absolute", left: "50%", bottom: 10,
+        marginLeft: -14,
+        fontSize: 28, lineHeight: 1,
+        animation: "fc-feral-vortex 0.5s linear infinite",
+        filter: "drop-shadow(0 0 12px #a855f7) drop-shadow(0 0 4px #ff4d6d)",
+      }}>
+        🌀
+      </div>
+
+      {/* Criss-crossing emojis */}
+      {[
+        { emoji: "🐺", anim: "fc-feral-cross-l", dur: "1.2s", delay: "0s"    },
+        { emoji: "😈", anim: "fc-feral-cross-r", dur: "1.0s", delay: "0.15s" },
+        { emoji: "⚡", anim: "fc-feral-cross-m", dur: "0.9s", delay: "0.3s"  },
+        { emoji: "🐺", anim: "fc-feral-cross-r", dur: "1.3s", delay: "0.5s"  },
+        { emoji: "💥", anim: "fc-feral-cross-l", dur: "1.1s", delay: "0.7s"  },
+        { emoji: "😵", anim: "fc-feral-cross-m", dur: "1.0s", delay: "0.9s"  },
+      ].map((p, i) => (
+        <div key={i} style={{
+          position: "absolute", left: "50%", bottom: 8, marginLeft: -8,
+          fontSize: 16,
+          animation: `${p.anim} ${p.dur} ${p.delay} ease-out infinite`,
+          filter: "drop-shadow(0 0 6px #a855f7)",
+        }}>
+          {p.emoji}
+        </div>
+      ))}
+
+      {/* Lightning bolts */}
+      <div style={{
+        position: "absolute", left: "50%", bottom: 14, marginLeft: -8,
+        fontSize: 18,
+        animation: "fc-feral-bolt-l 0.6s 0.1s ease-out infinite",
+        filter: "drop-shadow(0 0 6px #facc15)",
+      }}>⚡</div>
+      <div style={{
+        position: "absolute", left: "50%", bottom: 14, marginLeft: -8,
+        fontSize: 14,
+        animation: "fc-feral-bolt-r 0.6s 0.4s ease-out infinite",
+        filter: "drop-shadow(0 0 6px #facc15)",
+      }}>⚡</div>
+
+      {/* Raining question marks from above */}
+      {[
+        { emoji: "?",  dx: "-16px", dr: "-40deg", delay: "0s",    dur: "1.4s" },
+        { emoji: "❓", dx: "12px",  dr: "30deg",  delay: "0.3s",  dur: "1.6s" },
+        { emoji: "?",  dx: "22px",  dr: "-20deg", delay: "0.7s",  dur: "1.3s" },
+        { emoji: "❓", dx: "-8px",  dr: "50deg",  delay: "1.0s",  dur: "1.5s" },
+      ].map((q, i) => (
+        <div key={i} style={{
+          position: "absolute", left: "50%", bottom: 0, marginLeft: -8,
+          fontSize: 14, color: "#c084fc", fontWeight: 900,
+          "--dx": q.dx, "--dr": q.dr,
+          animation: `fc-feral-q ${q.dur} ${q.delay} ease-in infinite`,
+          filter: "drop-shadow(0 0 4px #c084fc)",
+        } as React.CSSProperties}>
+          {q.emoji}
+        </div>
+      ))}
+
+      {/* Flicker label */}
+      <div style={{
+        position: "absolute",
+        bottom: 104,
+        left: "50%",
+        transform: "translateX(-50%)",
+        whiteSpace: "nowrap",
+        fontSize: 10,
+        fontWeight: 900,
+        letterSpacing: "0.06em",
+        textTransform: "uppercase",
+        color: "#a855f7",
+        textShadow: "0 0 10px #a855f7cc",
+        animation: "fc-feral-label 0.35s steps(1) infinite",
+      }}>
+        {FERAL_LABELS[labelIdx]}
+      </div>
+    </div>
+  );
+}
+
 function MakeLoveAnimation() {
   const [labelIdx, setLabelIdx] = useState(0);
 
@@ -1172,7 +1310,8 @@ export default function FloatingCompanions() {
 
   const bothSameMood = jackMood === sallyMood;
   const sharedMood   = jackMood; // same as sallyMood when bothSameMood
-  const bothHorny    = jackMood === "horny" && sallyMood === "horny";
+  const bothHorny    = jackMood === "horny"  && sallyMood === "horny";
+  const bothFeral    = jackMood === "feral"   && sallyMood === "feral";
 
   const isBottom = corner.startsWith("bottom");
   const isRight  = corner.endsWith("right");
@@ -1281,7 +1420,21 @@ export default function FloatingCompanions() {
         className="flex items-end gap-1 relative"
         style={{ pointerEvents: "auto", flexDirection: isRight ? "row" : "row-reverse" }}
       >
-        {/* Controls: settings + collapse */}
+        {/* Feral hop keyframes — injected when both feral */}
+      {bothFeral && (
+        <style>{`
+          @keyframes fc-feral-hop-jack  {
+            0%   { transform: translateY(0)    rotate(-12deg) scaleX(0.85); }
+            100% { transform: translateY(-22px) rotate(14deg)  scaleX(1.1);  }
+          }
+          @keyframes fc-feral-hop-sally {
+            0%   { transform: translateY(0)    rotate(10deg)  scaleX(0.9);  }
+            100% { transform: translateY(-18px) rotate(-16deg) scaleX(1.15); }
+          }
+        `}</style>
+      )}
+
+      {/* Controls: settings + collapse */}
         <div
           className="absolute flex gap-1 z-50"
           style={{ top: -18, [isRight ? "right" : "left"]: 0 }}
@@ -1304,9 +1457,12 @@ export default function FloatingCompanions() {
 
         {/* Jack */}
         <div style={{
-          transform: bothHorny ? (isRight ? "rotate(8deg) translateX(6px)" : "rotate(-8deg) translateX(-6px)") : "none",
-          transition: "transform 0.8s cubic-bezier(0.34,1.56,0.64,1)",
+          transform: bothHorny
+            ? (isRight ? "rotate(8deg) translateX(6px)" : "rotate(-8deg) translateX(-6px)")
+            : "none",
+          transition: bothFeral ? "none" : "transform 0.8s cubic-bezier(0.34,1.56,0.64,1)",
           transformOrigin: "bottom center",
+          animation: bothFeral ? "fc-feral-hop-jack 0.32s ease-in-out infinite alternate" : "none",
         }}>
           <CompanionPanel
             owner="jack"
@@ -1319,17 +1475,22 @@ export default function FloatingCompanions() {
 
         {/* Center — sync effect or make love animation */}
         <div className="relative self-stretch" style={{ width: 8 }}>
-          {bothSameMood && sharedMood === "horny"
+          {bothHorny
             ? <MakeLoveAnimation />
-            : bothSameMood && <SyncEffect mood={sharedMood} />
+            : bothFeral
+              ? <GoFeralAnimation />
+              : bothSameMood && <SyncEffect mood={sharedMood} />
           }
         </div>
 
         {/* Sally */}
         <div style={{
-          transform: bothHorny ? (isRight ? "rotate(-8deg) translateX(-6px)" : "rotate(8deg) translateX(6px)") : "none",
-          transition: "transform 0.8s cubic-bezier(0.34,1.56,0.64,1)",
+          transform: bothHorny
+            ? (isRight ? "rotate(-8deg) translateX(-6px)" : "rotate(8deg) translateX(6px)")
+            : "none",
+          transition: bothFeral ? "none" : "transform 0.8s cubic-bezier(0.34,1.56,0.64,1)",
           transformOrigin: "bottom center",
+          animation: bothFeral ? "fc-feral-hop-sally 0.28s 0.1s ease-in-out infinite alternate" : "none",
         }}>
           <CompanionPanel
             owner="sally"
