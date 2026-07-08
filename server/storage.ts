@@ -1,6 +1,7 @@
 import { eq, and, desc } from "drizzle-orm";
 import {
   users, items, collections, collectionItems, profiles, links, linkLists, secretMessages, quotes, restaurants, dailyMoods,
+  groceryLists, groceryItems,
   type User, type InsertUser,
   type Item, type InsertItem,
   type Collection, type InsertCollection,
@@ -12,6 +13,7 @@ import {
   type Quote, type InsertQuote,
   type Restaurant, type InsertRestaurant,
   type DailyMood, type InsertDailyMood,
+  type GroceryList, type GroceryItem, type InsertGroceryList, type InsertGroceryItem,
   type ItemWithStatus,
   OWNERS, DEFAULT_COLLECTIONS,
 } from "@shared/schema";
@@ -179,6 +181,25 @@ try { sqlite.exec(`CREATE TABLE IF NOT EXISTS restaurants (
   added_by TEXT,
   visited_at INTEGER,
   created_at INTEGER NOT NULL DEFAULT 0
+)`); } catch {}
+
+// Migrate grocery tables
+try { sqlite.exec(`CREATE TABLE IF NOT EXISTS grocery_lists (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  name TEXT NOT NULL,
+  date TEXT NOT NULL,
+  is_template INTEGER NOT NULL DEFAULT 0,
+  created_by TEXT NOT NULL,
+  created_at TEXT NOT NULL DEFAULT ''
+)`); } catch {}
+try { sqlite.exec(`CREATE TABLE IF NOT EXISTS grocery_items (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  list_id INTEGER NOT NULL,
+  name TEXT NOT NULL,
+  location TEXT,
+  price REAL,
+  checked INTEGER NOT NULL DEFAULT 0,
+  sort_order INTEGER NOT NULL DEFAULT 0
 )`); } catch {}
 
 // Seed default profiles
@@ -415,6 +436,18 @@ export interface IStorage {
   getMood(owner: string, date: string): DailyMood | undefined;
   getMoodHistory(owner: string, limit?: number): DailyMood[];
   upsertMood(owner: string, date: string, mood: string, note?: string): DailyMood;
+
+  // Grocery
+  getGroceryLists(includeTemplates?: boolean): GroceryList[];
+  getGroceryList(id: number): GroceryList | undefined;
+  createGroceryList(data: Omit<InsertGroceryList, 'created_at'>): GroceryList;
+  updateGroceryList(id: number, data: Partial<InsertGroceryList>): GroceryList | undefined;
+  deleteGroceryList(id: number): void;
+  getGroceryItems(listId: number): GroceryItem[];
+  createGroceryItem(data: InsertGroceryItem): GroceryItem;
+  updateGroceryItem(id: number, data: Partial<InsertGroceryItem>): GroceryItem | undefined;
+  deleteGroceryItem(id: number): void;
+  cloneListFromTemplate(templateId: number, date: string, name: string, createdBy: string): GroceryList;
 }
 
 export class Storage implements IStorage {

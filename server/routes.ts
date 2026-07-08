@@ -707,4 +707,66 @@ export async function registerRoutes(httpServer: Server, app: Express) {
     const result = storage.upsertMood(owner, today, mood, note);
     res.json(result);
   });
+
+  // ── Grocery Lists ──────────────────────────────────────────────────────────
+
+  app.get("/api/grocery/lists", (_req, res) => {
+    res.json(storage.getGroceryLists(true));
+  });
+
+  app.post("/api/grocery/lists", (req, res) => {
+    const { name, date, is_template, created_by } = req.body;
+    if (!name || !date || !created_by) return res.status(400).json({ error: "name, date, created_by required" });
+    const list = storage.createGroceryList({ name, date, is_template: is_template ? 1 : 0, created_by });
+    res.json(list);
+  });
+
+  app.patch("/api/grocery/lists/:id", (req, res) => {
+    const id = Number(req.params.id);
+    const updated = storage.updateGroceryList(id, req.body);
+    if (!updated) return res.status(404).json({ error: "Not found" });
+    res.json(updated);
+  });
+
+  app.delete("/api/grocery/lists/:id", (req, res) => {
+    storage.deleteGroceryList(Number(req.params.id));
+    res.json({ ok: true });
+  });
+
+  app.post("/api/grocery/lists/:id/use-template", (req, res) => {
+    const templateId = Number(req.params.id);
+    const { date, name, created_by } = req.body;
+    if (!date || !name || !created_by) return res.status(400).json({ error: "date, name, created_by required" });
+    try {
+      const list = storage.cloneListFromTemplate(templateId, date, name, created_by);
+      res.json(list);
+    } catch (e: any) {
+      res.status(404).json({ error: e.message });
+    }
+  });
+
+  // ── Grocery Items ──────────────────────────────────────────────────────────
+
+  app.get("/api/grocery/lists/:id/items", (req, res) => {
+    res.json(storage.getGroceryItems(Number(req.params.id)));
+  });
+
+  app.post("/api/grocery/lists/:id/items", (req, res) => {
+    const list_id = Number(req.params.id);
+    const { name, location, price, sort_order } = req.body;
+    if (!name) return res.status(400).json({ error: "name required" });
+    const item = storage.createGroceryItem({ list_id, name, location: location ?? null, price: price ?? null, checked: 0, sort_order: sort_order ?? 0 });
+    res.json(item);
+  });
+
+  app.patch("/api/grocery/items/:id", (req, res) => {
+    const updated = storage.updateGroceryItem(Number(req.params.id), req.body);
+    if (!updated) return res.status(404).json({ error: "Not found" });
+    res.json(updated);
+  });
+
+  app.delete("/api/grocery/items/:id", (req, res) => {
+    storage.deleteGroceryItem(Number(req.params.id));
+    res.json({ ok: true });
+  });
 }

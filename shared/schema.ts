@@ -338,3 +338,32 @@ export const DEFAULT_COLLECTIONS: Array<{
   { name: "Wishlist",        description: "Podcasts I want to listen to",          mediaGroup: "podcast", defaultStatus: "wishlist" },
   { name: "Dropped",         description: "Podcasts I stopped listening to",       mediaGroup: "podcast", defaultStatus: "dropped" },
 ];
+
+// ── Grocery Lists ────────────────────────────────────────────────────────────
+
+export const groceryLists = sqliteTable("grocery_lists", {
+  id:          integer("id").primaryKey({ autoIncrement: true }),
+  name:        text("name").notNull(),
+  date:        text("date").notNull(),          // ISO date string YYYY-MM-DD
+  is_template: integer("is_template").notNull().default(0),  // 0=list, 1=template
+  created_by:  text("created_by").notNull(),    // "jack" | "sally"
+  created_at:  text("created_at").notNull().default(""),
+});
+
+export const groceryItems = sqliteTable("grocery_items", {
+  id:          integer("id").primaryKey({ autoIncrement: true }),
+  list_id:     integer("list_id").notNull(),
+  name:        text("name").notNull(),
+  location:    text("location"),               // optional store/aisle
+  price:       real("price"),                  // optional price
+  checked:     integer("checked").notNull().default(0),
+  sort_order:  integer("sort_order").notNull().default(0),
+});
+
+export const insertGroceryListSchema = createInsertSchema(groceryLists).omit({ id: true, created_at: true });
+export const insertGroceryItemSchema = createInsertSchema(groceryItems).omit({ id: true });
+
+export type GroceryList = typeof groceryLists.$inferSelect;
+export type GroceryItem = typeof groceryItems.$inferSelect;
+export type InsertGroceryList = typeof groceryLists.$inferInsert;
+export type InsertGroceryItem = typeof groceryItems.$inferInsert;
