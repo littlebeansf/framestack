@@ -445,9 +445,18 @@ function JackCreature({ mood, animClass, onClick }: {
     tired:   { l: "M-7,-3 L-3,-3",          r: "M3,-3 L7,-3" },
     loved:   { l: "heart",                   r: "heart" },
     chaotic: { l: "M-7,-5 L-5,-1 L-3,-5",  r: "M3,-5 L5,-1 L7,-5" },
-    numb:    { l: "M-7,-3 L-3,-3",          r: "M3,-3 L7,-3" },
+    numb:         { l: "M-7,-3 L-3,-3",          r: "M3,-3 L7,-3" },
+    horny:        { l: "heart",                   r: "heart" },
+    thirsty:      { l: "circle",                  r: "circle" },
+    feral:        { l: "M-7,-5 L-5,-1 L-3,-5",  r: "M3,-5 L5,-1 L7,-5" },
+    "down bad":   { l: "M-7,-5 Q-5,-1 -3,-4",    r: "M3,-5 Q5,-1 7,-4" },
+    brainrot:     { l: "circle",                  r: "circle" },
+    unhinged:     { l: "M-7,-5 L-5,-1 L-3,-5",  r: "M3,-5 L5,-1 L7,-5" },
+    wet:          { l: "M-7,-3 Q-5,-5 -3,-3",    r: "M3,-3 Q5,-5 7,-3" },
+    "touch starved": { l: "M-7,-2 Q-5,-5 -3,-2", r: "M3,-2 Q5,-5 7,-2" },
   };
-  const eye = eyes[mood];
+  // Guard: fallback to "happy" eyes if mood not in map
+  const eye = eyes[mood as keyof typeof eyes] ?? eyes.happy;
 
   const renderEye = (side: "l" | "r") => {
     const ey = eye[side];
