@@ -749,12 +749,14 @@ function CompanionPanel({
   bubbleSide,
   onCreatureClick,
   onMoodChange,
+  feralHop = null,
 }: {
   owner: "jack" | "sally";
   speech: string;
   bubbleSide: "left" | "right";
   onCreatureClick: () => void;
   onMoodChange: (k: MoodKey) => void;
+  feralHop?: "jack" | "sally" | null;
 }) {
   const today = todayISO();
   const moodKey = ["/api/mood", owner, today];
@@ -875,7 +877,16 @@ function CompanionPanel({
       )}
 
       {/* Creature */}
-      <div className="relative">
+      <div
+        className="relative"
+        style={feralHop ? {
+          animation: feralHop === "jack"
+            ? "fc-feral-hop-jack 0.32s ease-in-out infinite alternate"
+            : "fc-feral-hop-sally 0.28s 0.1s ease-in-out infinite alternate",
+          transformOrigin: "bottom center",
+          display: "inline-block",
+        } : undefined}
+      >
         <MiniParticles particles={particles} active={particlesActive} color={def.color} />
         {owner === "jack"
           ? <JackCreature mood={currentMood} animClass={animClass} onClick={handleClick} />
@@ -958,6 +969,281 @@ const SYNC_EFFECTS: Record<MoodKey, { particles: string[]; label: string; color:
   numb:    { particles: ["🩶","…","·"],   label: "…",             color: "#6b7280" },
 };
 
+
+
+// ── Custom shared-mood animations ─────────────────────────────────────────────
+
+// Sad — slow falling raindrops, dim pulses, little umbrella
+function SadSyncAnimation() {
+  return (
+    <div className="absolute pointer-events-none select-none overflow-visible"
+      style={{ zIndex: 35, left: "50%", bottom: 8, transform: "translateX(-50%)" }}>
+      <style>{`
+        @keyframes sd-drop { 0%{transform:translateY(-50px) translateX(var(--dx));opacity:0} 20%{opacity:0.8} 100%{transform:translateY(10px) translateX(var(--dx));opacity:0} }
+        @keyframes sd-dim  { 0%,100%{opacity:0.3;transform:scale(0.9)} 50%{opacity:0.8;transform:scale(1.1)} }
+        @keyframes sd-sway { 0%,100%{transform:translateX(-50%) rotate(-4deg)} 50%{transform:translateX(-50%) rotate(4deg)} }
+      `}</style>
+      {[{dx:"-12px",dur:"1.6s",delay:"0s"},{dx:"4px",dur:"2.0s",delay:"0.4s"},{dx:"14px",dur:"1.4s",delay:"0.8s"},{dx:"-4px",dur:"1.8s",delay:"1.1s"},{dx:"20px",dur:"1.5s",delay:"0.6s"}].map((d,i)=>(
+        <div key={i} style={{ position:"absolute", left:"50%", bottom:0, marginLeft:-6, fontSize:14, "--dx":d.dx, animation:`sd-drop ${d.dur} ${d.delay} ease-in infinite`, filter:"drop-shadow(0 0 3px #60a5fa)" } as React.CSSProperties}>💧</div>
+      ))}
+      <div style={{ position:"absolute", left:"50%", bottom:40, fontSize:22, animation:"sd-sway 3s ease-in-out infinite", transformOrigin:"bottom center", filter:"drop-shadow(0 0 8px #60a5fa88)" }}>☂️</div>
+      <div style={{ position:"absolute", bottom:80, left:"50%", transform:"translateX(-50%)", fontSize:10, fontWeight:700, color:"#60a5fa", textShadow:"0 0 8px #60a5fa88", animation:"sd-dim 2.5s ease-in-out infinite", whiteSpace:"nowrap" }}>it's okay…</div>
+    </div>
+  );
+}
+
+// Hyped — bouncing bars like a visualiser, lightning, WOOO label
+function HypedSyncAnimation() {
+  return (
+    <div className="absolute pointer-events-none select-none overflow-visible"
+      style={{ zIndex: 35, left: "50%", bottom: 8, transform: "translateX(-50%)" }}>
+      <style>{`
+        @keyframes hy-bar-0 { 0%,100%{height:8px}  50%{height:40px} }
+        @keyframes hy-bar-1 { 0%,100%{height:20px} 50%{height:55px} }
+        @keyframes hy-bar-2 { 0%,100%{height:12px} 50%{height:48px} }
+        @keyframes hy-bar-3 { 0%,100%{height:28px} 50%{height:36px} }
+        @keyframes hy-bar-4 { 0%,100%{height:6px}  50%{height:44px} }
+        @keyframes hy-zap   { 0%,100%{opacity:1;transform:scale(1) rotate(-10deg)} 50%{opacity:0.4;transform:scale(1.4) rotate(10deg)} }
+        @keyframes hy-label { 0%,100%{transform:translateX(-50%) scale(1)} 50%{transform:translateX(-50%) scale(1.15)} }
+      `}</style>
+      <div style={{ position:"absolute", bottom:0, left:"50%", transform:"translateX(-50%)", display:"flex", gap:3, alignItems:"flex-end" }}>
+        {[0,1,2,3,4].map(i=>(
+          <div key={i} style={{ width:5, background:`hsl(${20+i*12} 95% 55%)`, borderRadius:3, animation:`hy-bar-${i} ${0.35+i*0.07}s ${i*0.08}s ease-in-out infinite`, boxShadow:`0 0 8px hsl(${20+i*12} 95% 55%)` }} />
+        ))}
+      </div>
+      <div style={{ position:"absolute", left:"50%", bottom:50, marginLeft:-12, fontSize:22, animation:"hy-zap 0.4s ease-in-out infinite", filter:"drop-shadow(0 0 10px #f97316)" }}>⚡</div>
+      <div style={{ position:"absolute", bottom:90, left:"50%", fontSize:10, fontWeight:900, color:"#f97316", textShadow:"0 0 10px #f9731699", animation:"hy-label 0.5s ease-in-out infinite", whiteSpace:"nowrap", transform:"translateX(-50%)" }}>WOOOO</div>
+    </div>
+  );
+}
+
+// Cozy — floating leaves and steam curls, warm glow
+function CozySyncAnimation() {
+  return (
+    <div className="absolute pointer-events-none select-none overflow-visible"
+      style={{ zIndex: 35, left: "50%", bottom: 8, transform: "translateX(-50%)" }}>
+      <style>{`
+        @keyframes cz-leaf { 0%{transform:translateY(0) translateX(0) rotate(0deg);opacity:0} 20%{opacity:0.9} 80%{opacity:0.7} 100%{transform:translateY(-65px) translateX(var(--dx)) rotate(var(--dr));opacity:0} }
+        @keyframes cz-glow { 0%,100%{opacity:0.3;transform:scale(0.8)} 50%{opacity:0.7;transform:scale(1.2)} }
+        @keyframes cz-cup  { 0%,100%{transform:translateX(-50%) rotate(-3deg)} 50%{transform:translateX(-50%) rotate(3deg)} }
+      `}</style>
+      <div style={{ position:"absolute", left:"50%", bottom:6, width:30, height:30, borderRadius:"50%", background:"radial-gradient(circle,#a78bfa44,transparent 70%)", transform:"translateX(-50%)", animation:"cz-glow 2.5s ease-in-out infinite" }} />
+      {[{dx:"-14px",dr:"-30deg",delay:"0s",e:"🍂"},{dx:"10px",dr:"25deg",delay:"0.5s",e:"🍃"},{dx:"-6px",dr:"40deg",delay:"1s",e:"✿"},{dx:"18px",dr:"-20deg",delay:"0.8s",e:"🍂"}].map((l,i)=>(
+        <div key={i} style={{ position:"absolute", left:"50%", bottom:0, marginLeft:-8, fontSize:13, "--dx":l.dx,"--dr":l.dr, animation:`cz-leaf 3.0s ${l.delay} ease-out infinite`, filter:"drop-shadow(0 0 4px #a78bfa88)" } as React.CSSProperties}>{l.e}</div>
+      ))}
+      <div style={{ position:"absolute", left:"50%", bottom:34, fontSize:20, animation:"cz-cup 3s ease-in-out infinite", filter:"drop-shadow(0 0 8px #a78bfa88)" }}>🍵</div>
+      <div style={{ position:"absolute", bottom:82, left:"50%", fontSize:10, fontWeight:700, color:"#a78bfa", textShadow:"0 0 8px #a78bfa88", animation:"cz-glow 3s ease-in-out infinite", whiteSpace:"nowrap", transform:"translateX(-50%)" }}>cozy corner~</div>
+    </div>
+  );
+}
+
+// Tired — slow Zzz stack, drooping stars, very slow pulse
+function TiredSyncAnimation() {
+  return (
+    <div className="absolute pointer-events-none select-none overflow-visible"
+      style={{ zIndex: 35, left: "50%", bottom: 8, transform: "translateX(-50%)" }}>
+      <style>{`
+        @keyframes tr-zzz  { 0%{transform:translateY(0) translateX(0) scale(0.5);opacity:0} 30%{opacity:0.9} 100%{transform:translateY(-70px) translateX(10px) scale(1.2);opacity:0} }
+        @keyframes tr-star { 0%,100%{opacity:0.2;transform:scale(0.8) rotate(0deg)} 50%{opacity:0.6;transform:scale(1.1) rotate(20deg)} }
+        @keyframes tr-lbl  { 0%,100%{opacity:0.4} 50%{opacity:0.8} }
+      `}</style>
+      {[{delay:"0s",size:18,dx:"-4px"},{delay:"0.8s",size:14,dx:"6px"},{delay:"1.6s",size:10,dx:"-8px"}].map((z,i)=>(
+        <div key={i} style={{ position:"absolute", left:"50%", bottom:8, marginLeft:-8, fontSize:z.size, animation:`tr-zzz 2.4s ${z.delay} ease-out infinite`, color:"#94a3b8", filter:"drop-shadow(0 0 4px #94a3b888)" }}>z</div>
+      ))}
+      {["★","✦","·"].map((s,i)=>(
+        <div key={i} style={{ position:"absolute", left:"50%", bottom:40+i*14, marginLeft:(i-1)*16-6, fontSize:12, color:"#94a3b8", animation:`tr-star ${3+i*0.5}s ${i*0.6}s ease-in-out infinite`, filter:"drop-shadow(0 0 4px #94a3b866)" }}>{s}</div>
+      ))}
+      <div style={{ position:"absolute", bottom:85, left:"50%", fontSize:10, fontWeight:700, color:"#94a3b8", animation:"tr-lbl 3s ease-in-out infinite", whiteSpace:"nowrap", transform:"translateX(-50%)" }}>zzz…</div>
+    </div>
+  );
+}
+
+// Chaotic — fast random emoji spray, flicker, spinning ???
+function ChaoticSyncAnimation() {
+  const [tick, setTick] = useState(0);
+  useEffect(() => { const id = setInterval(()=>setTick(t=>t+1), 250); return ()=>clearInterval(id); }, []);
+  const POOL = ["🌀","❓","💥","⚡","😵","🤯","💫","🔮","👁️","‼️","??","!!"];
+  return (
+    <div className="absolute pointer-events-none select-none overflow-visible"
+      style={{ zIndex: 35, left: "50%", bottom: 8, transform: "translateX(-50%)" }}>
+      <style>{`
+        @keyframes ch-fly { 0%{opacity:1;transform:translate(0,0) rotate(0deg) scale(1)} 100%{opacity:0;transform:translate(var(--tx),var(--ty)) rotate(var(--tr)) scale(0.6)} }
+        @keyframes ch-spin{ 0%{transform:rotate(0deg)} 100%{transform:rotate(360deg)} }
+        @keyframes ch-flick{ 0%,49%{opacity:1} 50%,100%{opacity:0.2} }
+      `}</style>
+      {Array.from({length:6},(_,i)=>({
+        emoji: POOL[(tick*3+i*7)%POOL.length],
+        tx: `${(((tick+i)*37)%60)-30}px`,
+        ty: `${-(((tick+i)*29)%60)-10}px`,
+        tr: `${(((tick+i)*53)%180)-90}deg`,
+        delay: `${i*0.04}s`,
+      })).map((p,i)=>(
+        <div key={i} style={{ position:"absolute", left:"50%", bottom:8, marginLeft:-8, fontSize:14,
+          "--tx":p.tx,"--ty":p.ty,"--tr":p.tr,
+          animation:`ch-fly 0.7s ${p.delay} ease-out infinite`,
+          filter:"drop-shadow(0 0 5px #c084fc)",
+        } as React.CSSProperties}>{p.emoji}</div>
+      ))}
+      <div style={{ position:"absolute", left:"50%", bottom:44, fontSize:22, animation:"ch-spin 0.5s linear infinite", filter:"drop-shadow(0 0 10px #c084fc)" }}>🌀</div>
+      <div style={{ position:"absolute", bottom:85, left:"50%", fontSize:10, fontWeight:900, color:"#c084fc", textShadow:"0 0 8px #c084fc", animation:"ch-flick 0.28s steps(1) infinite", whiteSpace:"nowrap", transform:"translateX(-50%)" }}>??????</div>
+    </div>
+  );
+}
+
+// Numb — barely anything. Slow fading dots, silence
+function NumbSyncAnimation() {
+  return (
+    <div className="absolute pointer-events-none select-none overflow-visible"
+      style={{ zIndex: 35, left: "50%", bottom: 8, transform: "translateX(-50%)" }}>
+      <style>{`
+        @keyframes nm-dot { 0%,100%{opacity:0.1;transform:scale(0.7)} 50%{opacity:0.5;transform:scale(1)} }
+      `}</style>
+      {[0,1,2].map(i=>(
+        <div key={i} style={{ position:"absolute", left:"50%", bottom:12+i*22, marginLeft:-4, width:6, height:6, borderRadius:"50%", background:"#6b7280", animation:`nm-dot ${3+i*0.8}s ${i*1.1}s ease-in-out infinite` }} />
+      ))}
+      <div style={{ position:"absolute", bottom:85, left:"50%", fontSize:10, fontWeight:700, color:"#6b7280", whiteSpace:"nowrap", transform:"translateX(-50%)", opacity:0.4 }}>…</div>
+    </div>
+  );
+}
+
+// Thirsty — dripping water, wide eyes
+function ThirstySyncAnimation() {
+  return (
+    <div className="absolute pointer-events-none select-none overflow-visible"
+      style={{ zIndex: 35, left: "50%", bottom: 8, transform: "translateX(-50%)" }}>
+      <style>{`
+        @keyframes th-drip { 0%{transform:translateY(-30px) scaleY(0.5);opacity:0} 20%{opacity:1;transform:translateY(-20px) scaleY(1)} 80%{opacity:0.8} 100%{transform:translateY(8px) scaleY(1.3);opacity:0} }
+        @keyframes th-eye  { 0%,80%,100%{transform:scaleY(1)} 85%,95%{transform:scaleY(0.1)} }
+        @keyframes th-wave { 0%{transform:translateX(-50%) translateX(0)} 100%{transform:translateX(-50%) translateX(-14px)} }
+        @keyframes th-lbl  { 0%,100%{opacity:0.7} 50%{opacity:1} }
+      `}</style>
+      {[{delay:"0s",dx:"-8px"},{delay:"0.6s",dx:"4px"},{delay:"1.2s",dx:"10px"},{delay:"0.9s",dx:"-14px"}].map((d,i)=>(
+        <div key={i} style={{ position:"absolute", left:"50%", bottom:0, marginLeft:-5, fontSize:15, filter:"drop-shadow(0 0 4px #38bdf8)", animation:`th-drip 1.4s ${d.delay} ease-in infinite` }}>💧</div>
+      ))}
+      <div style={{ position:"absolute", left:"50%", bottom:40, fontSize:18, animation:"th-eye 2.2s ease-in-out infinite", filter:"drop-shadow(0 0 6px #38bdf8)" }}>👀</div>
+      <div style={{ position:"absolute", bottom:80, left:"50%", fontSize:10, fontWeight:700, color:"#38bdf8", textShadow:"0 0 8px #38bdf888", whiteSpace:"nowrap", transform:"translateX(-50%)", animation:"th-lbl 2s ease-in-out infinite" }}>hydration</div>
+    </div>
+  );
+}
+
+// Down Bad — spiral descent, crying, dramatic
+function DownBadSyncAnimation() {
+  return (
+    <div className="absolute pointer-events-none select-none overflow-visible"
+      style={{ zIndex: 35, left: "50%", bottom: 8, transform: "translateX(-50%)" }}>
+      <style>{`
+        @keyframes db-spiral { 0%{transform:rotate(0deg) translateX(18px) translateY(0) scale(1);opacity:0.9} 100%{transform:rotate(720deg) translateX(0px) translateY(-55px) scale(0.3);opacity:0} }
+        @keyframes db-sob    { 0%,100%{transform:scale(1)} 50%{transform:scale(1.2)} }
+        @keyframes db-lbl    { 0%,100%{transform:translateX(-50%) scale(0.95);opacity:0.8} 50%{transform:translateX(-50%) scale(1.05);opacity:1} }
+      `}</style>
+      {[{delay:"0s",emoji:"😭"},{delay:"0.5s",emoji:"💀"},{delay:"1s",emoji:"😭"},{delay:"1.5s",emoji:"🌊"}].map((p,i)=>(
+        <div key={i} style={{ position:"absolute", left:"50%", bottom:8, marginLeft:-10, fontSize:16, animation:`db-spiral 2.2s ${p.delay} ease-in infinite`, filter:"drop-shadow(0 0 5px #f43f5e)" }}>{p.emoji}</div>
+      ))}
+      <div style={{ position:"absolute", left:"50%", bottom:42, fontSize:22, animation:"db-sob 1.2s ease-in-out infinite", filter:"drop-shadow(0 0 8px #f43f5e)" }}>😭</div>
+      <div style={{ position:"absolute", bottom:84, left:"50%", fontSize:10, fontWeight:900, color:"#f43f5e", textShadow:"0 0 8px #f43f5e99", animation:"db-lbl 1.5s ease-in-out infinite", whiteSpace:"nowrap" }}>down BAD</div>
+    </div>
+  );
+}
+
+// Brainrot — flickering brain, rotating cursed emojis, tv static feel
+function BrainrotSyncAnimation() {
+  const [frame, setFrame] = useState(0);
+  useEffect(()=>{ const id = setInterval(()=>setFrame(f=>(f+1)%3), 200); return ()=>clearInterval(id); }, []);
+  const CURSED = ["🧠","💀","🌸","👁️","🍄","💊","📺","🤡"];
+  const LABELS = ["rotting…","brainrot","send help","🧠💀🧠"];
+  const [li, setLi] = useState(0);
+  useEffect(()=>{ const id = setInterval(()=>setLi(i=>(i+1)%LABELS.length), 600); return ()=>clearInterval(id); }, []);
+  return (
+    <div className="absolute pointer-events-none select-none overflow-visible"
+      style={{ zIndex: 35, left: "50%", bottom: 8, transform: "translateX(-50%)" }}>
+      <style>{`
+        @keyframes br-orbit { 0%{transform:rotate(0deg) translateX(20px)} 100%{transform:rotate(360deg) translateX(20px)} }
+        @keyframes br-flick { 0%,49%{opacity:1} 50%,100%{opacity:0.15} }
+        @keyframes br-shake { 0%,100%{transform:translateX(0)} 25%{transform:translateX(-3px)} 75%{transform:translateX(3px)} }
+      `}</style>
+      <div style={{ position:"absolute", left:"50%", bottom:10, marginLeft:-14, fontSize:26, animation:`br-shake 0.18s ease-in-out infinite, br-flick 0.4s steps(1) infinite`, filter:"drop-shadow(0 0 10px #ec4899)" }}>🧠</div>
+      {[0,1,2,3].map(i=>(
+        <div key={i} style={{ position:"absolute", left:"50%", bottom:28, marginLeft:-8, fontSize:12, animation:`br-orbit ${1.6+i*0.2}s ${i*0.2}s linear infinite`, filter:"drop-shadow(0 0 5px #ec4899)" }}>{CURSED[(frame*2+i)%CURSED.length]}</div>
+      ))}
+      <div style={{ position:"absolute", bottom:82, left:"50%", fontSize:10, fontWeight:900, color:"#ec4899", textShadow:"0 0 8px #ec489999", animation:"br-flick 0.3s steps(1) infinite", whiteSpace:"nowrap", transform:"translateX(-50%)" }}>{LABELS[li]}</div>
+    </div>
+  );
+}
+
+// Unhinged — everything at once, fast, loud
+function UnhingedSyncAnimation() {
+  const [tick, setTick] = useState(0);
+  useEffect(()=>{ const id = setInterval(()=>setTick(t=>t+1), 120); return ()=>clearInterval(id); }, []);
+  const THINGS = ["🌪️","😵","💥","⚡","🤯","🔥","❗","‼️","🫠","👁️"];
+  const WORDS = ["UNHINGED","CANNOT STOP","TOO MUCH","EVERYTHING","GONE","I LIED","STILL GOING","HELP","NO U","OK FINE"];
+  return (
+    <div className="absolute pointer-events-none select-none overflow-visible"
+      style={{ zIndex: 35, left: "50%", bottom: 8, transform: "translateX(-50%)" }}>
+      <style>{`
+        @keyframes uh-fly  { 0%{opacity:1;transform:translate(0,0) scale(1) rotate(0deg)} 100%{opacity:0;transform:translate(var(--tx),var(--ty)) scale(0.5) rotate(var(--tr))} }
+        @keyframes uh-spin { 0%{transform:rotate(0deg) scale(1)} 50%{transform:rotate(180deg) scale(1.4)} 100%{transform:rotate(360deg) scale(1)} }
+        @keyframes uh-lbl  { 0%,100%{opacity:1;color:#d946ef} 50%{opacity:0.2;color:#f97316} }
+      `}</style>
+      {Array.from({length:8},(_,i)=>({
+        emoji: THINGS[(tick+i*3)%THINGS.length],
+        tx: `${(((tick+i)*41)%80)-40}px`,
+        ty: `${-(((tick+i)*37)%70)-5}px`,
+        tr: `${(((tick+i)*61)%360)}deg`,
+        delay: `${i*0.025}s`,
+      })).map((p,i)=>(
+        <div key={i} style={{ position:"absolute", left:"50%", bottom:8, marginLeft:-8, fontSize:15,
+          "--tx":p.tx,"--ty":p.ty,"--tr":p.tr,
+          animation:`uh-fly 0.5s ${p.delay} ease-out infinite`,
+          filter:"drop-shadow(0 0 6px #d946ef)",
+        } as React.CSSProperties}>{p.emoji}</div>
+      ))}
+      <div style={{ position:"absolute", left:"50%", bottom:44, fontSize:24, animation:"uh-spin 0.35s linear infinite", filter:"drop-shadow(0 0 14px #d946ef)" }}>🌪️</div>
+      <div style={{ position:"absolute", bottom:86, left:"50%", fontSize:9, fontWeight:900, letterSpacing:"0.05em", animation:"uh-lbl 0.24s steps(1) infinite", whiteSpace:"nowrap", transform:"translateX(-50%)" }}>{WORDS[tick%WORDS.length]}</div>
+    </div>
+  );
+}
+
+// Wet — ripple rings, dripping, slow sway
+function WetSyncAnimation() {
+  return (
+    <div className="absolute pointer-events-none select-none overflow-visible"
+      style={{ zIndex: 35, left: "50%", bottom: 8, transform: "translateX(-50%)" }}>
+      <style>{`
+        @keyframes wt-ring { 0%{transform:translateX(-50%) scale(0.2);opacity:0.8;border-width:2px} 100%{transform:translateX(-50%) scale(2.5);opacity:0;border-width:0} }
+        @keyframes wt-drip { 0%{transform:translateY(-20px) scaleY(0.6);opacity:0} 20%{opacity:1} 100%{transform:translateY(12px) scaleY(1.4);opacity:0} }
+        @keyframes wt-sway { 0%,100%{transform:translateX(-50%) rotate(-5deg)} 50%{transform:translateX(-50%) rotate(5deg)} }
+      `}</style>
+      {[0,1,2].map(i=>(
+        <div key={i} style={{ position:"absolute", left:"50%", bottom:4, width:24, height:24, marginLeft:-12, borderRadius:"50%", border:"2px solid #06b6d4", animation:`wt-ring 1.8s ${i*0.6}s ease-out infinite`, boxShadow:"0 0 6px #06b6d466" }} />
+      ))}
+      {[{delay:"0s",dx:"-6px"},{delay:"0.7s",dx:"8px"},{delay:"1.3s",dx:"-12px"},{delay:"1.8s",dx:"4px"}].map((d,i)=>(
+        <div key={i} style={{ position:"absolute", left:"50%", bottom:0, marginLeft:-5, fontSize:14, filter:"drop-shadow(0 0 4px #06b6d4)", animation:`wt-drip 1.6s ${d.delay} ease-in infinite` }}>💦</div>
+      ))}
+      <div style={{ position:"absolute", left:"50%", bottom:40, fontSize:20, animation:"wt-sway 2.5s ease-in-out infinite", filter:"drop-shadow(0 0 8px #06b6d488)" }}>🌊</div>
+      <div style={{ position:"absolute", bottom:80, left:"50%", fontSize:10, fontWeight:700, color:"#06b6d4", textShadow:"0 0 8px #06b6d488", whiteSpace:"nowrap", transform:"translateX(-50%)" }}>soaked</div>
+    </div>
+  );
+}
+
+// Touch Starved — reaching hands, pulses, yearning
+function TouchStarvedSyncAnimation() {
+  return (
+    <div className="absolute pointer-events-none select-none overflow-visible"
+      style={{ zIndex: 35, left: "50%", bottom: 8, transform: "translateX(-50%)" }}>
+      <style>{`
+        @keyframes ts-reach-l { 0%,100%{transform:translateX(-18px) rotate(-20deg)} 50%{transform:translateX(-6px) rotate(-5deg)} }
+        @keyframes ts-reach-r { 0%,100%{transform:translateX(18px) rotate(20deg)}  50%{transform:translateX(6px)  rotate(5deg)}  }
+        @keyframes ts-pulse   { 0%,100%{transform:translateX(-50%) scale(0.7);opacity:0.4} 50%{transform:translateX(-50%) scale(1.3);opacity:0.9} }
+        @keyframes ts-float   { 0%,100%{transform:translateX(-50%) translateY(0)} 50%{transform:translateX(-50%) translateY(-8px)} }
+      `}</style>
+      <div style={{ position:"absolute", left:"50%", bottom:6, width:34, height:34, marginLeft:-17, borderRadius:"50%", background:"radial-gradient(circle,#fb718544,transparent 70%)", animation:"ts-pulse 2s ease-in-out infinite" }} />
+      <div style={{ position:"absolute", left:"50%", bottom:18, marginLeft:-24, fontSize:20, animation:"ts-reach-l 2s ease-in-out infinite" }}>🤲</div>
+      <div style={{ position:"absolute", left:"50%", bottom:18, marginLeft:4,  fontSize:20, animation:"ts-reach-r 2s ease-in-out infinite" }}>🤲</div>
+      <div style={{ position:"absolute", left:"50%", bottom:50, fontSize:18, animation:"ts-float 2.5s ease-in-out infinite", filter:"drop-shadow(0 0 8px #fb718588)" }}>💞</div>
+      <div style={{ position:"absolute", bottom:82, left:"50%", fontSize:10, fontWeight:700, color:"#fb7185", textShadow:"0 0 8px #fb718588", whiteSpace:"nowrap", transform:"translateX(-50%)" }}>hold me</div>
+    </div>
+  );
+}
 
 // ── Make Love animation — shown when both are on "horny" ─────────────────────
 
@@ -1460,9 +1746,8 @@ export default function FloatingCompanions() {
           transform: bothHorny
             ? (isRight ? "rotate(8deg) translateX(6px)" : "rotate(-8deg) translateX(-6px)")
             : "none",
-          transition: bothFeral ? "none" : "transform 0.8s cubic-bezier(0.34,1.56,0.64,1)",
+          transition: "transform 0.8s cubic-bezier(0.34,1.56,0.64,1)",
           transformOrigin: "bottom center",
-          animation: bothFeral ? "fc-feral-hop-jack 0.32s ease-in-out infinite alternate" : "none",
         }}>
           <CompanionPanel
             owner="jack"
@@ -1470,16 +1755,32 @@ export default function FloatingCompanions() {
             bubbleSide={jackBubble}
             onCreatureClick={handleJackClick}
             onMoodChange={(k) => { jackMoodRef.current = k; setJackMood(k); }}
+            feralHop={bothFeral ? "jack" : null}
           />
         </div>
 
         {/* Center — sync effect or make love animation */}
         <div className="relative self-stretch" style={{ width: 8 }}>
-          {bothHorny
-            ? <MakeLoveAnimation />
-            : bothFeral
-              ? <GoFeralAnimation />
-              : bothSameMood && <SyncEffect mood={sharedMood} />
+          {bothHorny         ? <MakeLoveAnimation />
+            : bothFeral       ? <GoFeralAnimation />
+            : bothSameMood    ? (() => {
+                switch(sharedMood) {
+                  case "sad":          return <SadSyncAnimation />;
+                  case "hyped":        return <HypedSyncAnimation />;
+                  case "cozy":         return <CozySyncAnimation />;
+                  case "tired":        return <TiredSyncAnimation />;
+                  case "chaotic":      return <ChaoticSyncAnimation />;
+                  case "numb":         return <NumbSyncAnimation />;
+                  case "thirsty":      return <ThirstySyncAnimation />;
+                  case "down bad":     return <DownBadSyncAnimation />;
+                  case "brainrot":     return <BrainrotSyncAnimation />;
+                  case "unhinged":     return <UnhingedSyncAnimation />;
+                  case "wet":          return <WetSyncAnimation />;
+                  case "touch starved":return <TouchStarvedSyncAnimation />;
+                  default:             return <SyncEffect mood={sharedMood} />;
+                }
+              })()
+            : null
           }
         </div>
 
@@ -1488,9 +1789,8 @@ export default function FloatingCompanions() {
           transform: bothHorny
             ? (isRight ? "rotate(-8deg) translateX(-6px)" : "rotate(8deg) translateX(6px)")
             : "none",
-          transition: bothFeral ? "none" : "transform 0.8s cubic-bezier(0.34,1.56,0.64,1)",
+          transition: "transform 0.8s cubic-bezier(0.34,1.56,0.64,1)",
           transformOrigin: "bottom center",
-          animation: bothFeral ? "fc-feral-hop-sally 0.28s 0.1s ease-in-out infinite alternate" : "none",
         }}>
           <CompanionPanel
             owner="sally"
@@ -1498,6 +1798,7 @@ export default function FloatingCompanions() {
             bubbleSide={sallyBubble}
             onCreatureClick={handleSallyClick}
             onMoodChange={(k) => { sallyMoodRef.current = k; setSallyMood(k); }}
+            feralHop={bothFeral ? "sally" : null}
           />
         </div>
       </div>
