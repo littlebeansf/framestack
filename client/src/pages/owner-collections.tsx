@@ -49,12 +49,12 @@ const MEDIA_TYPE_SECTIONS: Array<{
   Icon: any;
   statusOrder: string[];
 }> = [
-  { key: "anime",  label: "Anime",  Icon: Star,     statusOrder: ["watching", "completed", "want_to_rewatch", "dropped"] },
-  { key: "movie",  label: "Movie",  Icon: Film,     statusOrder: ["watching", "completed", "want_to_rewatch", "dropped"] },
-  { key: "series", label: "Series", Icon: Tv,       statusOrder: ["watching", "completed", "want_to_rewatch", "dropped"] },
-  { key: "manga",  label: "Manga",  Icon: BookOpen, statusOrder: ["reading", "completed", "wishlist", "owned"] },
-  { key: "book",    label: "Book",    Icon: Book,     statusOrder: ["reading", "completed", "wishlist", "owned"] },
-  { key: "podcast", label: "Podcast", Icon: Mic2,     statusOrder: ["listening", "completed", "wishlist", "dropped"] },
+  { key: "anime",  label: "Anime",  Icon: Star,     statusOrder: ["want_to_watch", "watching", "completed", "want_to_rewatch", "dropped"] },
+  { key: "movie",  label: "Movie",  Icon: Film,     statusOrder: ["want_to_watch", "watching", "completed", "want_to_rewatch", "dropped"] },
+  { key: "series", label: "Series", Icon: Tv,       statusOrder: ["want_to_watch", "watching", "completed", "want_to_rewatch", "dropped"] },
+  { key: "manga",  label: "Manga",  Icon: BookOpen, statusOrder: ["want_to_watch", "reading", "completed", "wishlist", "owned"] },
+  { key: "book",    label: "Book",    Icon: Book,     statusOrder: ["want_to_watch", "reading", "completed", "wishlist", "owned"] },
+  { key: "podcast", label: "Podcast", Icon: Mic2,     statusOrder: ["want_to_watch", "listening", "completed", "wishlist", "dropped"] },
 ];
 
 // Tab config (media types + custom)
@@ -128,6 +128,8 @@ function AddToCollectionDialog({
   item,
   owner,
   ownerCollections,
+  itemsByColId,
+  liveEmoji,
   onAdd,
 }: {
   open: boolean;
@@ -135,6 +137,8 @@ function AddToCollectionDialog({
   item: Item;
   owner: string;
   ownerCollections: Collection[];
+  itemsByColId: Record<number, any[]>;
+  liveEmoji: string;
   onAdd: (collectionId: number, status: string) => void;
 }) {
   const statuses = getStatusesForMediaType(item.mediaType);
@@ -147,7 +151,19 @@ function AddToCollectionDialog({
   const defaultCollections = ownerCollections.filter(c => c.isDefault && c.mediaGroup === exactGroup);
   const customCollections = ownerCollections.filter(c => !c.isDefault);
 
-  const meta = OWNER_META[owner] || OWNER_META.together;
+  // Which collections already contain this item?
+  const alreadyInColIds = useMemo(() => {
+    const ids = new Set<number>();
+    ownerCollections.forEach(col => {
+      const items = itemsByColId[col.id] ?? [];
+      if (items.some((it: any) => it.id === item.id)) ids.add(col.id);
+    });
+    return ids;
+  }, [ownerCollections, itemsByColId, item.id]);
+
+  const staticMeta = OWNER_META[owner] || OWNER_META.together;
+  // Use liveEmoji passed from parent (already resolved from profile API)
+  const meta = { ...staticMeta, emoji: liveEmoji };
   const color = STATUS_COLORS[selectedStatus] ?? "hsl(220 8% 55%)";
 
   function handleAdd() {
@@ -211,38 +227,62 @@ function AddToCollectionDialog({
             <div className="space-y-2">
               <p className="text-xs font-medium text-muted-foreground">Collection (optional)</p>
               <p className="text-[11px] text-muted-foreground/70">Defaults to the status-based collection for {meta.emoji}.</p>
-              <div className="flex flex-col gap-1 max-h-32 overflow-y-auto">
-                {defaultCollections.map(c => (
-                  <button
-                    key={c.id}
-                    onClick={() => setSelectedCollection(selectedCollection === c.id ? null : c.id)}
-                    className={cn(
-                      "flex items-center justify-between text-xs px-3 py-1.5 rounded-lg border text-left transition-colors",
-                      selectedCollection === c.id
-                        ? "bg-primary/10 border-primary/30 text-primary"
-                        : "border-border text-muted-foreground hover:bg-secondary"
-                    )}
-                  >
-                    <span>{c.name}</span>
-                    {c.defaultStatus === selectedStatus && (
-                      <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-primary/10 text-primary">auto</span>
-                    )}
-                  </button>
-                ))}
-                {customCollections.map(c => (
-                  <button
-                    key={c.id}
-                    onClick={() => setSelectedCollection(selectedCollection === c.id ? null : c.id)}
-                    className={cn(
-                      "flex items-center text-xs px-3 py-1.5 rounded-lg border text-left transition-colors",
-                      selectedCollection === c.id
-                        ? "bg-primary/10 border-primary/30 text-primary"
-                        : "border-border text-muted-foreground hover:bg-secondary"
-                    )}
-                  >
-                    {c.name}
-                  </button>
-                ))}
+              <div className="flex flex-col gap-1 max-h-40 overflow-y-auto">
+                {defaultCollections.map(c => {
+                  const alreadyIn = alreadyInColIds.has(c.id);
+                  const statusColor = c.defaultStatus ? STATUS_COLORS[c.defaultStatus] : null;
+                  return (
+                    <button
+                      key={c.id}
+                      onClick={() => setSelectedCollection(selectedCollection === c.id ? null : c.id)}
+                      className={cn(
+                        "flex items-center justify-between text-xs px-3 py-1.5 rounded-lg border text-left transition-colors",
+                        selectedCollection === c.id
+                          ? "bg-primary/10 border-primary/30 text-primary"
+                          : alreadyIn
+                          ? "border-border/60 bg-secondary/40 text-muted-foreground/60"
+                          : "border-border text-muted-foreground hover:bg-secondary"
+                      )}
+                    >
+                      <span className="flex items-center gap-1.5">
+                        {statusColor && (
+                          <span className="w-2 h-2 rounded-full shrink-0" style={{ background: statusColor }} />
+                        )}
+                        {c.name}
+                      </span>
+                      <span className="flex items-center gap-1 shrink-0">
+                        {alreadyIn && (
+                          <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-green-500/15 text-green-400 font-medium">✓ added</span>
+                        )}
+                        {c.defaultStatus === selectedStatus && !alreadyIn && (
+                          <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-primary/10 text-primary">auto</span>
+                        )}
+                      </span>
+                    </button>
+                  );
+                })}
+                {customCollections.map(c => {
+                  const alreadyIn = alreadyInColIds.has(c.id);
+                  return (
+                    <button
+                      key={c.id}
+                      onClick={() => setSelectedCollection(selectedCollection === c.id ? null : c.id)}
+                      className={cn(
+                        "flex items-center justify-between text-xs px-3 py-1.5 rounded-lg border text-left transition-colors",
+                        selectedCollection === c.id
+                          ? "bg-primary/10 border-primary/30 text-primary"
+                          : alreadyIn
+                          ? "border-border/60 bg-secondary/40 text-muted-foreground/60"
+                          : "border-border text-muted-foreground hover:bg-secondary"
+                      )}
+                    >
+                      <span>{c.name}</span>
+                      {alreadyIn && (
+                        <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-green-500/15 text-green-400 font-medium shrink-0">✓ added</span>
+                      )}
+                    </button>
+                  );
+                })}
               </div>
             </div>
           )}
@@ -266,7 +306,7 @@ function AddToCollectionDialog({
 
 type SortMode = "recent" | "title" | "rating" | "year";
 
-function LibraryMirror({ owner, ownerCollections, mediaGroup, itemsByColId }: { owner: string; ownerCollections: Collection[]; mediaGroup: "anime" | "book" | "podcast"; itemsByColId: Record<number, any[]> }) {
+function LibraryMirror({ owner, ownerCollections, mediaGroup, itemsByColId, liveEmoji }: { owner: string; ownerCollections: Collection[]; mediaGroup: "anime" | "book" | "podcast"; itemsByColId: Record<number, any[]>; liveEmoji: string }) {
   const { data: allItems } = useQuery<Item[]>({ queryKey: ["/api/items"] });
   const [search, setSearch] = useState("");
   const [addTarget, setAddTarget] = useState<Item | null>(null);
@@ -516,6 +556,8 @@ function LibraryMirror({ owner, ownerCollections, mediaGroup, itemsByColId }: { 
           item={addTarget}
           owner={owner}
           ownerCollections={ownerCollections}
+          itemsByColId={itemsByColId}
+          liveEmoji={liveEmoji}
           onAdd={(collectionId, status) => {
             const item = addTarget;
             setAddTarget(null);
@@ -852,6 +894,7 @@ export default function OwnerCollectionsPage({ owner }: { owner: string }) {
             mediaGroup={mirrorMediaGroup}
             ownerCollections={mirrorOwnerCols}
             itemsByColId={itemsByColId}
+            liveEmoji={meta.emoji}
           />
         </div>
       )}
