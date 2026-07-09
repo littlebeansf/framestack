@@ -28,7 +28,7 @@ import { Badge } from "@/components/ui/badge";
 import { FolderPlus, X } from "lucide-react";
 
 const TYPE_LABELS: Record<string, string> = {
-  anime: "Anime", manga: "Manga", movie: "Movie", series: "Series", book: "Book",
+  anime: "Anime", manga: "Manga", movie: "Movie", series: "Series", book: "Book", podcast: "Podcast",
 };
 
 export default function ItemEditDialog({
