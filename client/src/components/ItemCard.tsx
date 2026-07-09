@@ -4,7 +4,7 @@ import { apiRequest } from "@/lib/queryClient";
 import { localStore } from "@/lib/localStore";
 import { useToast } from "@/hooks/use-toast";
 import type { Item } from "@shared/schema";
-import { STATUS_LABELS, STATUS_COLORS, getMediaGroup } from "@shared/schema";
+import { STATUS_LABELS, STATUS_COLORS, getMediaGroup, getStatusLabel } from "@shared/schema";
 import { cn } from "@/lib/utils";
 import {
   DropdownMenu,
@@ -46,7 +46,7 @@ export default function ItemCard({
 
   const inCollection = collectionId !== undefined;
   const statusColor = collectionStatus ? (STATUS_COLORS[collectionStatus] ?? "hsl(220 8% 55%)") : null;
-  const statusLabel = collectionStatus ? (STATUS_LABELS[collectionStatus] ?? collectionStatus) : null;
+  const statusLabel = collectionStatus ? getStatusLabel(collectionStatus, item.mediaType) : null;
 
   const deleteMutation = useMutation({
     mutationFn: async () => {

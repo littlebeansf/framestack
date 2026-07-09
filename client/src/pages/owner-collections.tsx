@@ -2,7 +2,7 @@ import { useState, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient, useQueries } from "@tanstack/react-query";
 import { apiRequest, API_BASE, getAuthToken } from "@/lib/queryClient";
 import type { Collection, Item } from "@shared/schema";
-import { STATUS_LABELS, STATUS_COLORS, getStatusesForMediaType, getMediaGroup, getExactMediaGroup } from "@shared/schema";
+import { STATUS_LABELS, STATUS_COLORS, getStatusesForMediaType, getMediaGroup, getExactMediaGroup, getStatusLabel } from "@shared/schema";
 import { useLocation } from "wouter";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
@@ -216,7 +216,7 @@ function AddToCollectionDialog({
                   }}
                 >
                   {selectedStatus === s && <Check size={9} />}
-                  {STATUS_LABELS[s] ?? s}
+                  {getStatusLabel(s, item.mediaType)}
                 </button>
               ))}
             </div>
@@ -378,7 +378,7 @@ function LibraryMirror({ owner, ownerCollections, mediaGroup, itemsByColId, live
         return [...old, { ...item, collectionStatus: status }];
       });
       setAddedItems(prev => new Set(prev).add(item.id));
-      toast({ title: "Added!", description: `${item.title} → ${STATUS_LABELS[status] ?? status}` });
+      toast({ title: "Added!", description: `${item.title} → ${getStatusLabel(status, item.mediaType)}` });
     },
     onError: () => toast({ title: "Failed to add", variant: "destructive" }),
   });
@@ -508,13 +508,13 @@ function LibraryMirror({ owner, ownerCollections, mediaGroup, itemsByColId, live
                             color: "white",
                             maxWidth: "52px",
                           }}
-                          title={`${ec.name} — ${STATUS_LABELS[ec.status] ?? ec.status}`}
+                          title={`${ec.name} — ${getStatusLabel(ec.status, item.mediaType)}`}
                         >
                           <span
                             className="w-1.5 h-1.5 rounded-full shrink-0"
                             style={{ background: "rgba(255,255,255,0.7)" }}
                           />
-                          <span className="truncate">{STATUS_LABELS[ec.status] ?? ec.status}</span>
+                          <span className="truncate">{getStatusLabel(ec.status, item.mediaType)}</span>
                         </div>
                       ))}
                       {existingCollections.length > 3 && (

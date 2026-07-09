@@ -5,11 +5,10 @@ import { apiRequest } from "@/lib/queryClient";
 import { localStore } from "@/lib/localStore";
 import type { Collection } from "@shared/schema";
 import type { ItemWithStatus } from "@shared/schema";
-import { STATUS_LABELS, STATUS_COLORS, getStatusesForMediaType } from "@shared/schema";
+import { STATUS_LABELS, STATUS_COLORS, getStatusesForMediaType, getStatusLabel } from "@shared/schema";
 import { useToast } from "@/hooks/use-toast";
-import { ArrowLeft, FolderOpen, Clock, ChevronDown } from "lucide-react";
+import { ArrowLeft, FolderOpen, ChevronDown } from "lucide-react";
 import ItemCard from "@/components/ItemCard";
-import { calcCollectionTimeStats, formatDuration } from "@/lib/timeEstimate";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -43,7 +42,7 @@ function StatusChip({
   const statuses = getStatusesForMediaType(item.mediaType);
   const currentStatus = item.collectionStatus;
   const color = currentStatus ? (STATUS_COLORS[currentStatus] ?? "hsl(220 8% 55%)") : "hsl(220 8% 55%)";
-  const label = currentStatus ? (STATUS_LABELS[currentStatus] ?? currentStatus) : "Set status";
+  const label = currentStatus ? getStatusLabel(currentStatus, item.mediaType) : "Set status";
 
   return (
     <DropdownMenu>
@@ -80,64 +79,11 @@ function StatusChip({
               className="w-2 h-2 rounded-full shrink-0"
               style={{ backgroundColor: STATUS_COLORS[s] ?? "hsl(220 8% 55%)" }}
             />
-            {STATUS_LABELS[s] ?? s}
+            {getStatusLabel(s, item.mediaType)}
           </DropdownMenuItem>
         ))}
       </DropdownMenuContent>
     </DropdownMenu>
-  );
-}
-
-// ── Time Bar ─────────────────────────────────────────────────────────────────
-
-function CollectionTimeBar({ items }: { items: ItemWithStatus[] }) {
-  const stats = calcCollectionTimeStats(items);
-  if (!stats.hasEstimate || items.length === 0) return null;
-
-  const segments = [
-    { frac: stats.completedFrac,  color: "hsl(160 65% 45%)",  label: "Completed" },
-    { frac: stats.inProgressFrac, color: "hsl(255 70% 65%)",  label: "In progress" },
-    { frac: stats.notStartedFrac, color: "hsl(220 8% 30%)",   label: "Not started" },
-  ].filter(s => s.frac > 0);
-
-  return (
-    <div className="rounded-xl border border-border bg-card p-4 space-y-3">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2 text-muted-foreground">
-          <Clock size={13} />
-          <span className="text-xs font-medium">Estimated time</span>
-        </div>
-        <span className="text-sm font-bold text-foreground" style={{ fontFamily: "'Cabinet Grotesk', sans-serif" }}>
-          {formatDuration(stats.totalMinutes)}
-        </span>
-      </div>
-
-      <div className="flex h-2 rounded-full overflow-hidden gap-px bg-secondary">
-        {segments.map((s, i) => (
-          <div
-            key={i}
-            className="h-full rounded-full transition-all duration-700"
-            style={{ width: `${s.frac * 100}%`, backgroundColor: s.color }}
-          />
-        ))}
-      </div>
-
-      <div className="flex items-center gap-4 flex-wrap">
-        {[
-          stats.completedMinutes   > 0 && { color: "hsl(160 65% 45%)", label: "Completed",   mins: stats.completedMinutes },
-          stats.inProgressMinutes  > 0 && { color: "hsl(255 70% 65%)", label: "In progress", mins: stats.inProgressMinutes },
-          stats.notStartedMinutes  > 0 && { color: "hsl(220 8% 45%)",  label: "Not started", mins: stats.notStartedMinutes },
-        ].filter(Boolean).map((seg: any) => (
-          <div key={seg.label} className="flex items-center gap-1.5">
-            <div className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: seg.color }} />
-            <span className="text-[11px] text-muted-foreground">
-              {seg.label} <span className="text-foreground/70">{formatDuration(seg.mins)}</span>
-            </span>
-          </div>
-        ))}
-        <span className="text-[10px] text-muted-foreground/40 ml-auto">estimated</span>
-      </div>
-    </div>
   );
 }
 
@@ -202,7 +148,8 @@ export default function CollectionDetailPage() {
       qc.setQueryData<ItemWithStatus[]>(["/api/collections", id, "items"], (old = []) =>
         old.map(i => i.id === itemId ? { ...i, collectionStatus: status } : i)
       );
-      toast({ title: STATUS_LABELS[status] ?? status, description: "Status updated" });
+      const changedItem = (items || []).find(i => i.id === itemId);
+      toast({ title: getStatusLabel(status, changedItem?.mediaType), description: "Status updated" });
     },
     onError: () => toast({ title: "Failed to update status", variant: "destructive" }),
   });
@@ -251,11 +198,6 @@ export default function CollectionDetailPage() {
           </span>
         </div>
       </div>
-
-      {/* Time bar */}
-      {!isLoading && itemList.length > 0 && (
-        <CollectionTimeBar items={itemList} />
-      )}
 
       {/* Items grid */}
       {isLoading ? (

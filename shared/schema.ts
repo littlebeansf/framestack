@@ -85,8 +85,10 @@ export function getStatusesForMediaType(mediaType: string): readonly string[] {
 }
 
 export const STATUS_LABELS: Record<string, string> = {
-  // Universal
-  want_to_watch: "Want to Watch",
+  // Per-group (resolved in UI by media type where needed)
+  want_to_watch: "Want to Watch",   // anime / movie / series
+  want_to_read:  "Want to Read",    // manga / book
+  want_to_listen: "Want to Listen", // podcast
   // Anime/Movie/Series
   watching: "Watching",
   completed: "Completed",
@@ -99,6 +101,17 @@ export const STATUS_LABELS: Record<string, string> = {
   // Podcast
   listening: "Listening",
 };
+
+// Resolve the correct human label for a status, taking media type into account.
+// "want_to_watch" renders differently for books/manga/podcast.
+export function getStatusLabel(status: string, mediaType?: string): string {
+  if (status === "want_to_watch" && mediaType) {
+    const g = getMediaGroup(mediaType);
+    if (g === "book") return "Want to Read";
+    if (g === "podcast") return "Want to Listen";
+  }
+  return STATUS_LABELS[status] ?? status;
+}
 
 export const STATUS_COLORS: Record<string, string> = {
   want_to_watch: "hsl(45 90% 55%)",   // amber — "queued up"
@@ -329,19 +342,19 @@ export const DEFAULT_COLLECTIONS: Array<{
   { name: "Want to Rewatch", description: "Series worth another go",               mediaGroup: "series", defaultStatus: "want_to_rewatch" },
   { name: "Dropped",         description: "Series I abandoned",                   mediaGroup: "series", defaultStatus: "dropped" },
   // ── Manga
-  { name: "Want to Watch",   description: "Manga I want to read",                  mediaGroup: "manga",  defaultStatus: "want_to_watch" },
+  { name: "Want to Read",    description: "Manga I want to read",                  mediaGroup: "manga",  defaultStatus: "want_to_watch" },
   { name: "Reading",         description: "Manga I'm currently reading",           mediaGroup: "manga",  defaultStatus: "reading" },
   { name: "Completed",       description: "Manga I finished",                      mediaGroup: "manga",  defaultStatus: "completed" },
   { name: "Wishlist",        description: "Manga I want to read",                  mediaGroup: "manga",  defaultStatus: "wishlist" },
   { name: "Owned",           description: "Manga I own but haven't started",       mediaGroup: "manga",  defaultStatus: "owned" },
   // ── Book
-  { name: "Want to Watch",   description: "Books I want to read",                  mediaGroup: "book",   defaultStatus: "want_to_watch" },
+  { name: "Want to Read",    description: "Books I want to read",                  mediaGroup: "book",   defaultStatus: "want_to_watch" },
   { name: "Reading",         description: "Books I'm currently reading",           mediaGroup: "book",   defaultStatus: "reading" },
   { name: "Completed",       description: "Books I finished",                      mediaGroup: "book",   defaultStatus: "completed" },
   { name: "Wishlist",        description: "Books I want to read",                  mediaGroup: "book",   defaultStatus: "wishlist" },
   { name: "Owned",           description: "Books I own but haven't started",       mediaGroup: "book",   defaultStatus: "owned" },
   // ── Podcast
-  { name: "Want to Watch",   description: "Podcasts I want to listen to",          mediaGroup: "podcast", defaultStatus: "want_to_watch" },
+  { name: "Want to Listen",  description: "Podcasts I want to listen to",          mediaGroup: "podcast", defaultStatus: "want_to_watch" },
   { name: "Listening",       description: "Podcasts I'm currently listening to",   mediaGroup: "podcast", defaultStatus: "listening" },
   { name: "Completed",       description: "Podcasts I finished",                   mediaGroup: "podcast", defaultStatus: "completed" },
   { name: "Wishlist",        description: "Podcasts I want to listen to",          mediaGroup: "podcast", defaultStatus: "wishlist" },
