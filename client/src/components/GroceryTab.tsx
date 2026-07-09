@@ -188,6 +188,52 @@ function ItemRow({
   );
 }
 
+// ── Price summary ────────────────────────────────────────────────────────────
+
+function PriceSummary({ items }: { items: GroceryItem[] }) {
+  const priced   = items.filter(i => i.price != null);
+  if (priced.length === 0) return null;
+
+  const total    = priced.reduce((s, i) => s + (i.price ?? 0), 0);
+  const spent    = priced.filter(i => i.checked).reduce((s, i) => s + (i.price ?? 0), 0);
+  const remaining = total - spent;
+  const hasChecked = priced.some(i => i.checked);
+
+  return (
+    <div className="mt-3 rounded-xl border border-border/40 bg-background/30 px-4 py-3 flex items-center justify-between gap-4">
+      <div className="flex items-center gap-3 flex-wrap">
+        <div className="text-center">
+          <p className="text-[10px] text-muted-foreground uppercase tracking-widest">Total</p>
+          <p className="text-sm font-bold tabular-nums" style={{ color: ACCENT }}>
+            €{total.toFixed(2)}
+          </p>
+        </div>
+        {hasChecked && (
+          <>
+            <div className="w-px h-6 bg-border/40" />
+            <div className="text-center">
+              <p className="text-[10px] text-muted-foreground uppercase tracking-widest">Spent</p>
+              <p className="text-sm font-semibold tabular-nums text-green-400">
+                €{spent.toFixed(2)}
+              </p>
+            </div>
+            <div className="w-px h-6 bg-border/40" />
+            <div className="text-center">
+              <p className="text-[10px] text-muted-foreground uppercase tracking-widest">Left</p>
+              <p className="text-sm font-semibold tabular-nums text-muted-foreground">
+                €{remaining.toFixed(2)}
+              </p>
+            </div>
+          </>
+        )}
+      </div>
+      <div className="text-[10px] text-muted-foreground/50 text-right flex-shrink-0">
+        {priced.length} of {items.length} item{items.length !== 1 ? "s" : ""} priced
+      </div>
+    </div>
+  );
+}
+
 // ── Add item form ─────────────────────────────────────────────────────────────
 
 function AddItemForm({ listId }: { listId: number }) {
@@ -353,6 +399,7 @@ function ListCard({
             <ItemRow key={item.id} item={item} listId={list.id} />
           ))}
           <AddItemForm listId={list.id} />
+          <PriceSummary items={items} />
         </div>
       )}
     </div>
@@ -428,6 +475,7 @@ function ArchivedCard({
             ? <p className="text-xs text-muted-foreground text-center py-2">No items</p>
             : items.map(item => <ItemRow key={item.id} item={item} listId={list.id} readOnly />)
           }
+          <PriceSummary items={items} />
         </div>
       )}
     </div>
