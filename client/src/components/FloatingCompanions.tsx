@@ -1597,7 +1597,9 @@ function cornerStyle(corner: Corner): React.CSSProperties {
   return style;
 }
 
-export default function FloatingCompanions() {
+export type CompanionPlacement = "float" | "sidebar" | "mobile";
+
+export default function FloatingCompanions({ placement = "float" }: { placement?: CompanionPlacement }) {
   const [jackSpeech, setJackSpeech] = useState("");
   const [sallySpeech, setSallySpeech] = useState("");
   const [collapsed, setCollapsed] = useState(false);
@@ -1695,10 +1697,155 @@ export default function FloatingCompanions() {
     setTimeout(() => setSallySpeech(""), 6000);
   }
 
+  // ── Sidebar placement (tablet, inside nav) ────────────────────────────────
+  if (placement === "sidebar") {
+    if (collapsed) {
+      return (
+        <div
+          className="flex items-center justify-center gap-2 px-3 py-2 cursor-pointer select-none opacity-50 hover:opacity-100 transition-opacity"
+          onClick={() => setCollapsed(false)}
+          title="Show companions"
+        >
+          <span className="text-lg">👻</span>
+          <span className="text-lg">🦊</span>
+        </div>
+      );
+    }
+    return (
+      <div ref={widgetRef} className="px-2 pb-3" style={{ pointerEvents: "none" }}>
+        <div className="flex items-end justify-center gap-1 relative">
+          <CompanionPanel
+            owner="jack"
+            speech={jackSpeech}
+            bubbleSide="right"
+            onCreatureClick={handleJackClick}
+            onMoodChange={(k) => { jackMoodRef.current = k; setJackMood(k); }}
+            feralHop={bothFeral ? "jack" : null}
+            eyeOffset={eyeOffset}
+          />
+          {bothSameMood && (() => {
+            switch (sharedMood) {
+              case "loved":       return <LovedSyncAnimation />;
+              case "feral":       return <GoFeralAnimation />;
+              case "horny":       return <MakeLoveAnimation />;
+              case "chaotic":     return <ChaoticSyncAnimation />;
+              case "brainrot":    return <BrainrotSyncAnimation />;
+              case "unhinged":    return <UnhingedSyncAnimation />;
+              case "happy":       return <SyncEffect mood="happy" />;
+              case "cozy":        return <SyncEffect mood="cozy" />;
+              case "hyped":       return <SyncEffect mood="hyped" />;
+              case "tired":       return <SyncEffect mood="tired" />;
+              case "sad":         return <SyncEffect mood="sad" />;
+              case "touch starved":return <TouchStarvedSyncAnimation />;
+              default:             return <SyncEffect mood={sharedMood} />;
+            }
+          })()}
+          <CompanionPanel
+            owner="sally"
+            speech={sallySpeech}
+            bubbleSide="left"
+            onCreatureClick={handleSallyClick}
+            onMoodChange={(k) => { sallyMoodRef.current = k; setSallyMood(k); }}
+            feralHop={bothFeral ? "sally" : null}
+            eyeOffset={eyeOffset}
+          />
+        </div>
+        {/* Collapse button */}
+        <div style={{ pointerEvents: "auto", textAlign: "center", marginTop: 2 }}>
+          <button
+            onClick={() => setCollapsed(true)}
+            className="text-[9px] text-muted-foreground/40 hover:text-muted-foreground transition-colors px-2"
+          >hide</button>
+        </div>
+      </div>
+    );
+  }
+
+  // ── Mobile placement (sticky top bar) ───────────────────────────────────────
+  if (placement === "mobile") {
+    if (collapsed) {
+      return (
+        <div
+          className="flex items-center gap-2 px-4 py-2 border-b border-border/50 bg-background/90 backdrop-blur-sm cursor-pointer select-none"
+          onClick={() => setCollapsed(false)}
+        >
+          <span className="text-base">👻</span>
+          <span className="text-xs text-muted-foreground flex-1">Jack &amp; Sally</span>
+          <span className="text-base">🦊</span>
+          <span className="text-[10px] text-muted-foreground/50 ml-1">▼ show</span>
+        </div>
+      );
+    }
+    return (
+      <div
+        ref={widgetRef}
+        className="border-b border-border/50 bg-background/95 backdrop-blur-sm"
+        style={{ pointerEvents: "none" }}
+      >
+        {/* Collapse bar */}
+        <div
+          className="flex items-center justify-between px-4 pt-1.5 pb-0"
+          style={{ pointerEvents: "auto" }}
+        >
+          <span className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground/40">Companions</span>
+          <button
+            onClick={() => setCollapsed(true)}
+            className="text-[9px] text-muted-foreground/40 hover:text-muted-foreground transition-colors"
+          >▲ hide</button>
+        </div>
+        {/* Compact horizontal companion row */}
+        <div className="flex items-end justify-center gap-0 relative overflow-hidden px-2 pb-1">
+          <div style={{ transform: "scale(0.75)", transformOrigin: "bottom center" }}>
+            <CompanionPanel
+              owner="jack"
+              speech={jackSpeech}
+              bubbleSide="right"
+              onCreatureClick={handleJackClick}
+              onMoodChange={(k) => { jackMoodRef.current = k; setJackMood(k); }}
+              feralHop={bothFeral ? "jack" : null}
+              eyeOffset={{ x: 0, y: 0 }}
+            />
+          </div>
+          <div className="flex-1 flex items-end justify-center relative" style={{ minHeight: 60 }}>
+            {bothSameMood && (() => {
+              switch (sharedMood) {
+                case "loved":       return <LovedSyncAnimation />;
+                case "feral":       return <GoFeralAnimation />;
+                case "horny":       return <MakeLoveAnimation />;
+                case "chaotic":     return <ChaoticSyncAnimation />;
+                case "brainrot":    return <BrainrotSyncAnimation />;
+                case "unhinged":    return <UnhingedSyncAnimation />;
+                case "happy":       return <SyncEffect mood="happy" />;
+                case "cozy":        return <SyncEffect mood="cozy" />;
+                case "hyped":       return <SyncEffect mood="hyped" />;
+                case "tired":       return <SyncEffect mood="tired" />;
+                case "sad":         return <SyncEffect mood="sad" />;
+                case "touch starved":return <TouchStarvedSyncAnimation />;
+                default:             return <SyncEffect mood={sharedMood} />;
+              }
+            })()}
+          </div>
+          <div style={{ transform: "scale(0.75)", transformOrigin: "bottom center" }}>
+            <CompanionPanel
+              owner="sally"
+              speech={sallySpeech}
+              bubbleSide="left"
+              onCreatureClick={handleSallyClick}
+              onMoodChange={(k) => { sallyMoodRef.current = k; setSallyMood(k); }}
+              feralHop={bothFeral ? "sally" : null}
+              eyeOffset={{ x: 0, y: 0 }}
+            />
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // ── Float placement (desktop fixed corner) ───────────────────────────────────
   if (collapsed) {
     return (
       <div
-        className="hidden md:flex items-center gap-1 cursor-pointer select-none"
+        className="hidden lg:flex items-center gap-1 cursor-pointer select-none"
         style={cornerStyle(corner)}
         onClick={() => setCollapsed(false)}
         title="Show companions"
@@ -1716,7 +1863,7 @@ export default function FloatingCompanions() {
   return (
     <div
       ref={widgetRef}
-      className="hidden md:block"
+      className="hidden lg:block"
       style={{ ...cornerStyle(corner), pointerEvents: "none" }}
     >
       {/* Settings panel */}

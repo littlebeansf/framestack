@@ -7,7 +7,7 @@ import { apiRequest, API_BASE } from "@/lib/queryClient";
 import { cn } from "@/lib/utils";
 import { Library, Search, Menu, Sun, Moon, Sparkles, Download } from "lucide-react";
 import SearchDialog from "@/components/SearchDialog";
-import FloatingCompanions from "@/components/FloatingCompanions";
+import FloatingCompanions, { CompanionPlacement } from "@/components/FloatingCompanions";
 import type { Profile } from "@shared/schema";
 
 // Default emojis — used until profile data loads
@@ -247,6 +247,11 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
         ))}
       </ul>
 
+      {/* Companions — tablet only (md, not lg) */}
+      <div className="hidden md:block lg:hidden border-t border-sidebar-border/60 pt-2 mt-auto">
+        <FloatingCompanions placement="sidebar" />
+      </div>
+
       {/* Bottom */}
       <div className="px-3 pb-4 border-t border-sidebar-border pt-3 space-y-0.5">
         {/* Backup download — always visible so data is never lost */}
@@ -352,13 +357,19 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
           </button>
         </header>
 
+        {/* Companions — mobile sticky bar (below mobile header) */}
+        <div className="md:hidden">
+          <FloatingCompanions placement="mobile" />
+        </div>
+
         <main className="flex-1 p-4 md:p-6 lg:p-8 max-w-7xl w-full mx-auto">
           {children}
         </main>
       </div>
 
       <SearchDialog open={searchOpen} onOpenChange={setSearchOpen} />
-      <FloatingCompanions />
+      {/* Companions — desktop floating corner (lg+) */}
+      <FloatingCompanions placement="float" />
     </div>
   );
 }
