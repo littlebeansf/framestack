@@ -129,6 +129,26 @@ sqlite.exec(`
   );
 `);
 
+// ─── Performance indexes (CREATE IF NOT EXISTS — safe to run every boot) ──────
+try {
+  sqlite.exec(`
+    CREATE INDEX IF NOT EXISTS idx_ci_collection ON collection_items(collection_id);
+    CREATE INDEX IF NOT EXISTS idx_ci_item       ON collection_items(item_id);
+    CREATE INDEX IF NOT EXISTS idx_col_owner     ON collections(owner);
+    CREATE INDEX IF NOT EXISTS idx_col_default   ON collections(is_default, owner);
+    CREATE INDEX IF NOT EXISTS idx_items_type    ON items(media_type);
+    CREATE INDEX IF NOT EXISTS idx_items_source  ON items(external_source, external_id);
+    CREATE INDEX IF NOT EXISTS idx_gi_list       ON grocery_items(list_id);
+    CREATE INDEX IF NOT EXISTS idx_links_list    ON links(list_id);
+    CREATE INDEX IF NOT EXISTS idx_moods_owner   ON daily_moods(owner, date);
+    CREATE INDEX IF NOT EXISTS idx_events_date   ON events(date);
+    CREATE INDEX IF NOT EXISTS idx_quotes_owner  ON quotes(owner);
+    CREATE INDEX IF NOT EXISTS idx_msgs_to       ON secret_messages(\"to\", read_at);
+  `);
+} catch (e) {
+  console.warn("[indexes] failed:", e);
+}
+
 // Add new columns to existing tables if upgrading
 try { sqlite.exec(`ALTER TABLE items ADD COLUMN added_by TEXT`); } catch {}
 try { sqlite.exec(`ALTER TABLE collections ADD COLUMN owner TEXT NOT NULL DEFAULT 'together'`); } catch {}

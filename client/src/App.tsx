@@ -1,18 +1,24 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, lazy, Suspense } from "react";
 import { Switch, Route, Router } from "wouter";
 import { useHashLocation } from "wouter/use-hash-location";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { queryClient, getAuthToken, setToken, isAuthenticated, API_BASE } from "@/lib/queryClient";
 import { Toaster } from "@/components/ui/toaster";
 
-import LibraryPage from "@/pages/library";
-import JackPage from "@/pages/jack";
-import SallyPage from "@/pages/sally";
-import TogetherPage from "@/pages/together";
-import CollectionDetailPage from "@/pages/collection-detail";
-import ProfilePage from "@/pages/profile";
-import NotFound from "@/pages/not-found";
+// Lazy-load heavy page components to reduce initial bundle parse time
+const LibraryPage        = lazy(() => import("@/pages/library"));
+const JackPage           = lazy(() => import("@/pages/jack"));
+const SallyPage          = lazy(() => import("@/pages/sally"));
+const TogetherPage       = lazy(() => import("@/pages/together"));
+const CollectionDetailPage = lazy(() => import("@/pages/collection-detail"));
+const ProfilePage        = lazy(() => import("@/pages/profile"));
+const NotFound           = lazy(() => import("@/pages/not-found"));
 import AppShell from "@/components/AppShell";
+
+// Minimal fallback — matches dark background so no flash
+const PageFallback = () => (
+  <div style={{ minHeight: "60vh", background: "transparent" }} />
+);
 
 // ─────────────────────────────────────────────────────────────────────────────
 // SPLASH — two nerd-hearts slide in, merge, become one together-heart
@@ -224,6 +230,7 @@ export default function App() {
     <QueryClientProvider client={queryClient}>
       <Router hook={useHashLocation}>
         <AppShell>
+          <Suspense fallback={<PageFallback />}>
           <Switch>
             <Route path="/" component={LibraryPage} />
             <Route path="/library" component={LibraryPage} />
@@ -245,6 +252,7 @@ export default function App() {
             <Route path="/profile" component={ProfilePage} />
             <Route component={NotFound} />
           </Switch>
+          </Suspense>
         </AppShell>
       </Router>
       <Toaster />

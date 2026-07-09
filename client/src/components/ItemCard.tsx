@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, memo } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { localStore } from "@/lib/localStore";
@@ -24,7 +24,7 @@ const TYPE_ICONS: Record<string, any> = {
   book: Book,
 };
 
-export default function ItemCard({
+function ItemCard({
   item,
   index = 0,
   // Collection-context props (when shown inside a collection)
@@ -191,3 +191,6 @@ export default function ItemCard({
     </>
   );
 }
+
+// Memoize to prevent re-renders in large library lists when unrelated state changes
+export default memo(ItemCard);

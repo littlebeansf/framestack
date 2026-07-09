@@ -1617,6 +1617,11 @@ export default function FloatingCompanions() {
   const widgetRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
+    // Skip eye tracking when collapsed — no creatures visible
+    if (collapsed) {
+      setEyeOffset({ x: 0, y: 0 });
+      return;
+    }
     function onMouseMove(e: MouseEvent) {
       // Use the widget bounding box center as reference
       const el = widgetRef.current;
@@ -1640,7 +1645,7 @@ export default function FloatingCompanions() {
     }
     window.addEventListener("mousemove", onMouseMove);
     return () => window.removeEventListener("mousemove", onMouseMove);
-  }, []);
+  }, [collapsed]);
 
   const bothSameMood = jackMood === sallyMood;
   const sharedMood   = jackMood; // same as sallyMood when bothSameMood
