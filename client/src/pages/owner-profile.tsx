@@ -106,41 +106,185 @@ function getAnimationClass(bgStyle: string): string {
 
 // ── Animated background overlays ──────────────────────────────────────────────
 
-function StarfieldOverlay({ accent }: { accent: string }) {
-  const stars = useMemo(() =>
-    Array.from({ length: 60 }, (_, i) => ({
-      x: Math.random() * 100,
-      y: Math.random() * 100,
-      r: Math.random() * 1.8 + 0.4,
-      delay: Math.random() * 4,
-      dur: Math.random() * 3 + 2,
-    })), []);
+// ── Overlay animation components ─────────────────────────────────────────────
 
+/** Stars — twinkling dots */
+function OverlayStars() {
+  const stars = useMemo(() =>
+    Array.from({ length: 55 }, () => ({
+      x: Math.random() * 100, y: Math.random() * 100,
+      r: Math.random() * 1.6 + 0.3,
+      delay: Math.random() * 5, dur: Math.random() * 3 + 2,
+    })), []);
   return (
-    <svg className="absolute inset-0 w-full h-full pointer-events-none" style={{ opacity: 0.5 }}>
+    <svg className="absolute inset-0 w-full h-full pointer-events-none" style={{ opacity: 0.55 }}>
       {stars.map((s, i) => (
-        <circle
-          key={i}
-          cx={`${s.x}%`} cy={`${s.y}%`} r={s.r}
-          fill="white"
-          style={{
-            animation: `twinkle ${s.dur}s ${s.delay}s ease-in-out infinite alternate`,
-            opacity: 0.6,
-          }}
+        <circle key={i} cx={`${s.x}%`} cy={`${s.y}%`} r={s.r} fill="white"
+          style={{ animation: `twinkle ${s.dur}s ${s.delay}s ease-in-out infinite alternate`, opacity: 0.7 }} />
+      ))}
+    </svg>
+  );
+}
+
+/** Rain — thin diagonal streaks falling */
+function OverlayRain({ accent }: { accent: string }) {
+  const drops = useMemo(() =>
+    Array.from({ length: 30 }, () => ({
+      x: Math.random() * 110 - 5,
+      dur: Math.random() * 1.2 + 0.8,
+      delay: Math.random() * 2,
+      len: Math.random() * 18 + 10,
+      opacity: Math.random() * 0.35 + 0.1,
+    })), []);
+  return (
+    <svg className="absolute inset-0 w-full h-full pointer-events-none overflow-hidden">
+      <defs>
+        <style>{`@keyframes rain-fall { 0%{transform:translateY(-10%)} 100%{transform:translateY(130%)} }`}</style>
+      </defs>
+      {drops.map((d, i) => (
+        <line key={i}
+          x1={`${d.x}%`} y1="0%"
+          x2={`${d.x + 1.5}%`} y2={`${d.len}px`}
+          stroke={accent} strokeWidth="1" strokeOpacity={d.opacity}
+          style={{ animation: `rain-fall ${d.dur}s ${d.delay}s linear infinite` }}
         />
       ))}
     </svg>
   );
 }
 
-function AuroraOverlay({ accent }: { accent: string }) {
+/** Fireflies — glowing dots that drift */
+function OverlayFireflies({ accent }: { accent: string }) {
+  const flies = useMemo(() =>
+    Array.from({ length: 18 }, () => ({
+      x: Math.random() * 100, y: Math.random() * 100,
+      r: Math.random() * 3 + 2,
+      dx: (Math.random() - 0.5) * 8, dy: (Math.random() - 0.5) * 8,
+      dur: Math.random() * 5 + 4,
+      delay: Math.random() * 4,
+    })), []);
   return (
-    <div className="absolute inset-0 pointer-events-none overflow-hidden">
-      <div className="aurora-blob-1 absolute" style={{ background: `${accent}55` }} />
-      <div className="aurora-blob-2 absolute" style={{ background: `${accent}33` }} />
-      <div className="aurora-blob-3 absolute" style={{ background: `${accent}22` }} />
+    <svg className="absolute inset-0 w-full h-full pointer-events-none">
+      <defs>
+        <filter id="ff-glow"><feGaussianBlur stdDeviation="2.5" result="blur" /><feMerge><feMergeNode in="blur" /><feMergeNode in="SourceGraphic" /></feMerge></filter>
+        <style>{`@keyframes ff-float { 0%,100%{transform:translate(0,0);opacity:.9} 50%{transform:translate(var(--dx),var(--dy));opacity:.3} }`}</style>
+      </defs>
+      {flies.map((f, i) => (
+        <circle key={i} cx={`${f.x}%`} cy={`${f.y}%`} r={f.r} fill={accent} filter="url(#ff-glow)"
+          style={{
+            // @ts-ignore
+            "--dx": `${f.dx}px`, "--dy": `${f.dy}px`,
+            animation: `ff-float ${f.dur}s ${f.delay}s ease-in-out infinite`,
+          } as React.CSSProperties} />
+      ))}
+    </svg>
+  );
+}
+
+/** Grid — subtle animated perspective grid */
+function OverlayGrid({ accent }: { accent: string }) {
+  return (
+    <div className="absolute inset-0 pointer-events-none overflow-hidden" style={{ opacity: 0.18 }}>
+      <div style={{
+        position: "absolute", inset: "-50%",
+        backgroundImage: `linear-gradient(${accent}60 1px, transparent 1px), linear-gradient(90deg, ${accent}60 1px, transparent 1px)`,
+        backgroundSize: "32px 32px",
+        animation: "grid-drift 8s linear infinite",
+        transform: "perspective(200px) rotateX(20deg)",
+      }} />
     </div>
   );
+}
+
+/** Sparkles — star-shaped pops at random positions */
+function OverlaySparkles({ accent }: { accent: string }) {
+  const sparks = useMemo(() =>
+    Array.from({ length: 14 }, () => ({
+      x: Math.random() * 95 + 2, y: Math.random() * 90 + 5,
+      size: Math.random() * 10 + 6,
+      dur: Math.random() * 2 + 1.5,
+      delay: Math.random() * 4,
+    })), []);
+  const star = (cx: number, cy: number, r: number) => {
+    const pts: string[] = [];
+    for (let k = 0; k < 8; k++) {
+      const angle = (k * Math.PI) / 4;
+      const rad = k % 2 === 0 ? r : r * 0.4;
+      pts.push(`${cx + Math.cos(angle) * rad},${cy + Math.sin(angle) * rad}`);
+    }
+    return pts.join(" ");
+  };
+  return (
+    <svg className="absolute inset-0 w-full h-full pointer-events-none">
+      <defs>
+        <style>{`@keyframes sparkle-pulse { 0%,100%{opacity:0;transform:scale(0) rotate(0deg)} 50%{opacity:1;transform:scale(1) rotate(45deg)} }`}</style>
+      </defs>
+      {sparks.map((s, i) => (
+        <polygon key={i}
+          points={star(s.x * 10, s.y * 2.2, s.size)}
+          fill={accent}
+          style={{ animation: `sparkle-pulse ${s.dur}s ${s.delay}s ease-in-out infinite`, transformOrigin: `${s.x * 10}px ${s.y * 2.2}px`, opacity: 0 }}
+        />
+      ))}
+    </svg>
+  );
+}
+
+/** Ripples — concentric circles expanding outward */
+function OverlayRipples({ accent }: { accent: string }) {
+  const origins = useMemo(() =>
+    Array.from({ length: 6 }, () => ({
+      x: Math.random() * 100, y: Math.random() * 100,
+      dur: Math.random() * 3 + 3,
+      delay: Math.random() * 4,
+    })), []);
+  return (
+    <svg className="absolute inset-0 w-full h-full pointer-events-none">
+      <defs>
+        <style>{`@keyframes ripple-out { 0%{r:4px;opacity:.8;stroke-width:2} 100%{r:80px;opacity:0;stroke-width:0.5} }`}</style>
+      </defs>
+      {origins.map((o, i) => (
+        <circle key={i} cx={`${o.x}%`} cy={`${o.y}%`} r="4"
+          fill="none" stroke={accent} strokeWidth="2"
+          style={{ animation: `ripple-out ${o.dur}s ${o.delay}s ease-out infinite` }} />
+      ))}
+    </svg>
+  );
+}
+
+/** Aurora blobs — large soft colour masses */
+function OverlayAurora({ accent }: { accent: string }) {
+  return (
+    <div className="absolute inset-0 pointer-events-none overflow-hidden">
+      <div className="aurora-blob-1 absolute" style={{ background: `${accent}44`, filter: "blur(40px)" }} />
+      <div className="aurora-blob-2 absolute" style={{ background: `${accent}28`, filter: "blur(50px)" }} />
+      <div className="aurora-blob-3 absolute" style={{ background: `${accent}18`, filter: "blur(60px)" }} />
+    </div>
+  );
+}
+
+const OVERLAY_STYLES: Array<{ id: string; label: string; emoji: string; desc: string }> = [
+  { id: "stars",     label: "Stars",     emoji: "✦",  desc: "Twinkling dots" },
+  { id: "fireflies", label: "Fireflies", emoji: "✨", desc: "Glowing drifters" },
+  { id: "rain",      label: "Rain",      emoji: "🌧", desc: "Falling streaks" },
+  { id: "sparkles",  label: "Sparkles",  emoji: "⭐", desc: "Star pops" },
+  { id: "ripples",   label: "Ripples",   emoji: "◎",  desc: "Expanding rings" },
+  { id: "grid",      label: "Grid",      emoji: "⊞",  desc: "Perspective grid" },
+  { id: "aurora",    label: "Aurora",    emoji: "🌌", desc: "Colour blobs" },
+  { id: "none",      label: "None",      emoji: "—",  desc: "Clean background" },
+];
+
+function BannerOverlay({ style, accent }: { style: string; accent: string }) {
+  switch (style) {
+    case "stars":     return <OverlayStars />;
+    case "fireflies": return <OverlayFireflies accent={accent} />;
+    case "rain":      return <OverlayRain accent={accent} />;
+    case "sparkles":  return <OverlaySparkles accent={accent} />;
+    case "ripples":   return <OverlayRipples accent={accent} />;
+    case "grid":      return <OverlayGrid accent={accent} />;
+    case "aurora":    return <OverlayAurora accent={accent} />;
+    default:          return null;
+  }
 }
 
 // ── Stat card ─────────────────────────────────────────────────────────────────
@@ -343,6 +487,7 @@ type FormState = {
   vibeTags: string;   // JSON array
   top3: string;       // JSON array
   bgStyle: string; bgCustom: string;
+  overlayStyle: string;
   profileMusicUrl: string; profileMusicLabel: string;
 };
 
@@ -372,6 +517,7 @@ function EditProfileDialog({
     top3: (profile as any).top3 ?? "[]",
     bgStyle: (profile as any).bgStyle ?? "solid",
     bgCustom: (profile as any).bgCustom ?? "",
+    overlayStyle: (profile as any).bannerPattern ?? "stars",
     profileMusicUrl: (profile as any).profileMusicUrl ?? "",
     profileMusicLabel: (profile as any).profileMusicLabel ?? "",
   });
@@ -382,7 +528,9 @@ function EditProfileDialog({
 
   const mutation = useMutation({
     mutationFn: async () => {
-      const res = await apiRequest("PATCH", `/api/profiles/${owner}`, form);
+      const { overlayStyle, ...rest } = form;
+      const payload = { ...rest, bannerPattern: overlayStyle };
+      const res = await apiRequest("PATCH", `/api/profiles/${owner}`, payload);
       return res.json();
     },
     onSuccess: (data) => {
@@ -750,6 +898,29 @@ function EditProfileDialog({
                   )}
                 </div>
               )}
+
+              {/* Overlay animation */}
+              <div>
+                <label className="label-xs">Overlay animation</label>
+                <div className="grid grid-cols-4 gap-2 mt-2">
+                  {OVERLAY_STYLES.map(ov => (
+                    <button
+                      key={ov.id}
+                      onClick={() => f("overlayStyle", ov.id)}
+                      className={cn(
+                        "flex flex-col items-center gap-1 py-2 px-1 rounded-xl border-2 transition-all text-center",
+                        form.overlayStyle === ov.id
+                          ? "border-white/60 bg-white/10 scale-105"
+                          : "border-border hover:border-white/20 hover:bg-white/5"
+                      )}
+                    >
+                      <span className="text-base leading-none">{ov.emoji}</span>
+                      <span className="text-[9px] font-bold text-white/80 leading-none">{ov.label}</span>
+                      <span className="text-[8px] text-white/40 leading-none hidden sm:block">{ov.desc}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
             </>
           )}
         </div>
@@ -901,7 +1072,7 @@ export default function OwnerProfilePage({ owner }: { owner: string }) {
 
   const bannerBg = getBannerBg(bgStyle, bgCustom, accent, banner);
   const animClass = getAnimationClass(bgStyle);
-  const isAurora = bgStyle === "aurora" || bgStyle === "cosmic";
+  const overlayStyle = (profile as any).bannerPattern ?? "stars";
 
   return (
     <div className="max-w-2xl animate-page-in space-y-5">
@@ -911,14 +1082,8 @@ export default function OwnerProfilePage({ owner }: { owner: string }) {
         {/* BG */}
         <div className={cn("absolute inset-0", animClass)} style={{ background: bannerBg }} />
 
-        {/* Overlays */}
-        <StarfieldOverlay accent={accent} />
-        {isAurora && <AuroraOverlay accent={accent} />}
-
-        {/* Floating blobs */}
-        <div className="absolute -top-8 -right-8 w-40 h-40 blob opacity-15" style={{ background: accent }} />
-        <div className="absolute bottom-0 left-4 w-24 h-24 blob opacity-10" style={{ background: accent, animationDelay: "3s" }} />
-        <div className="absolute top-4 left-1/2 w-16 h-16 blob opacity-8" style={{ background: accent, animationDelay: "6s" }} />
+        {/* Overlay animation */}
+        <BannerOverlay style={overlayStyle} accent={accent} />
 
         {/* Content */}
         <div className="relative z-10 p-6 pt-8 flex flex-col sm:flex-row items-start sm:items-end gap-5">
