@@ -711,7 +711,15 @@ export default function OwnerCollectionsPage({ owner }: { owner: string }) {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   const qc = useQueryClient();
-  const meta = OWNER_META[owner] || OWNER_META.together;
+
+  // Fetch live profile so emoji stays in sync with whatever the user set
+  const { data: liveProfile } = useQuery<{ avatarEmoji?: string }>({ 
+    queryKey: ["/api/profiles", owner],
+    queryFn: async () => { const r = await apiRequest("GET", `/api/profiles/${owner}`, undefined); return r.json(); },
+    staleTime: 60_000,
+  });
+  const staticMeta = OWNER_META[owner] || OWNER_META.together;
+  const meta = { ...staticMeta, emoji: liveProfile?.avatarEmoji ?? staticMeta.emoji };
 
   const { data: collections, isLoading } = useQuery<Collection[]>({
     queryKey: ["/api/collections", owner],
