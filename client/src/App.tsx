@@ -240,6 +240,7 @@ export default function App() {
             <Route path="/together/links">{() => <TogetherPage sub="links" />}</Route>
             <Route path="/together/restaurants">{() => <TogetherPage sub="restaurants" />}</Route>
             <Route path="/together/grocery">{() => <TogetherPage sub="grocery" />}</Route>
+            <Route path="/together/calendar">{() => <TogetherPage sub="calendar" />}</Route>
             <Route path="/collections/:id" component={CollectionDetailPage} />
             <Route path="/profile" component={ProfilePage} />
             <Route component={NotFound} />

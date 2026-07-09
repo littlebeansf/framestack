@@ -1,7 +1,7 @@
 import { eq, and, desc } from "drizzle-orm";
 import {
   users, items, collections, collectionItems, profiles, links, linkLists, secretMessages, quotes, restaurants, dailyMoods,
-  groceryLists, groceryItems,
+  groceryLists, groceryItems, events,
   type User, type InsertUser,
   type Item, type InsertItem,
   type Collection, type InsertCollection,
@@ -14,6 +14,7 @@ import {
   type Restaurant, type InsertRestaurant,
   type DailyMood, type InsertDailyMood,
   type GroceryList, type GroceryItem, type InsertGroceryList, type InsertGroceryItem,
+  type Event, type InsertEvent,
   type ItemWithStatus,
   OWNERS, DEFAULT_COLLECTIONS,
 } from "@shared/schema";
@@ -194,6 +195,17 @@ try { sqlite.exec(`CREATE TABLE IF NOT EXISTS grocery_lists (
   created_at TEXT NOT NULL DEFAULT ''
 )`); } catch {}
 try { sqlite.exec(`ALTER TABLE grocery_lists ADD COLUMN is_completed INTEGER NOT NULL DEFAULT 0`); } catch {}
+try { sqlite.exec(`CREATE TABLE IF NOT EXISTS events (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  title TEXT NOT NULL,
+  date TEXT NOT NULL,
+  end_date TEXT,
+  time TEXT,
+  category TEXT NOT NULL DEFAULT 'other',
+  notes TEXT,
+  created_by TEXT NOT NULL,
+  created_at TEXT NOT NULL DEFAULT ''
+)`); } catch {}
 try { sqlite.exec(`CREATE TABLE IF NOT EXISTS grocery_items (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   list_id INTEGER NOT NULL,
@@ -794,6 +806,25 @@ export class Storage implements IStorage {
       });
     });
     return newList;
+  }
+
+  // ── Events ───────────────────────────────────────────────────────────────
+  getEvents() {
+    return db.select().from(events).orderBy(events.date).all();
+  }
+  getEvent(id: number) {
+    return db.select().from(events).where(eq(events.id, id)).get();
+  }
+  createEvent(data: Omit<InsertEvent, 'created_at'>) {
+    return db.insert(events)
+      .values({ ...data, created_at: new Date().toISOString() })
+      .returning().get()!;
+  }
+  updateEvent(id: number, data: Partial<InsertEvent>) {
+    return db.update(events).set(data).where(eq(events.id, id)).returning().get();
+  }
+  deleteEvent(id: number) {
+    db.delete(events).where(eq(events.id, id)).run();
   }
 }
 

@@ -6,6 +6,7 @@ import OwnerIntro from "@/components/OwnerIntro";
 import LinkList from "@/components/LinkList";
 import RestaurantTracker from "@/components/RestaurantTracker";
 import GroceryTab from "@/components/GroceryTab";
+import CalendarTab from "@/components/CalendarTab";
 import { navHistory } from "@/lib/navHistory";
 import { cn } from "@/lib/utils";
 
@@ -15,12 +16,13 @@ const TABS = [
   { id: "links",       label: "Links",        path: "/together/links" },
   { id: "restaurants", label: "🍽️ Eats",      path: "/together/restaurants" },
   { id: "grocery",     label: "🛒 Grocery",   path: "/together/grocery" },
+  { id: "calendar",    label: "📅 Calendar",  path: "/together/calendar" },
 ];
 const accent = "hsl(20 90% 60%)";
 
 export default function TogetherPage({ sub }: { sub?: string }) {
   const [, setLocation] = useLocation();
-  const tab = sub === "collections" ? "collections" : sub === "links" ? "links" : sub === "restaurants" ? "restaurants" : sub === "grocery" ? "grocery" : "profile";
+  const tab = sub === "collections" ? "collections" : sub === "links" ? "links" : sub === "restaurants" ? "restaurants" : sub === "grocery" ? "grocery" : sub === "calendar" ? "calendar" : "profile";
   // Show intro only when arriving from a different owner section (or fresh load)
   const [showIntro, setShowIntro] = useState(() => !navHistory.prev.startsWith("/together"));
   const onDone = useCallback(() => setShowIntro(false), []);
@@ -50,6 +52,7 @@ export default function TogetherPage({ sub }: { sub?: string }) {
       {tab === "links"       && <LinkList />}
       {tab === "restaurants" && <RestaurantTracker />}
       {tab === "grocery"     && <GroceryTab />}
+      {tab === "calendar"    && <CalendarTab />}
     </div>
   );
 }

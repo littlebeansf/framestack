@@ -769,4 +769,28 @@ export async function registerRoutes(httpServer: Server, app: Express) {
     storage.deleteGroceryItem(Number(req.params.id));
     res.json({ ok: true });
   });
+
+  // ── Events ──────────────────────────────────────────────────────────
+
+  app.get("/api/events", (_req, res) => {
+    res.json(storage.getEvents());
+  });
+
+  app.post("/api/events", (req, res) => {
+    const { title, date, end_date, time, category, notes, created_by } = req.body;
+    if (!title || !date || !created_by) return res.status(400).json({ error: "title, date, created_by required" });
+    const event = storage.createEvent({ title, date, end_date: end_date ?? null, time: time ?? null, category: category ?? "other", notes: notes ?? null, created_by });
+    res.json(event);
+  });
+
+  app.patch("/api/events/:id", (req, res) => {
+    const updated = storage.updateEvent(Number(req.params.id), req.body);
+    if (!updated) return res.status(404).json({ error: "Not found" });
+    res.json(updated);
+  });
+
+  app.delete("/api/events/:id", (req, res) => {
+    storage.deleteEvent(Number(req.params.id));
+    res.json({ ok: true });
+  });
 }

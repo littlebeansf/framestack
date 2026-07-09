@@ -361,6 +361,24 @@ export const groceryItems = sqliteTable("grocery_items", {
   sort_order:  integer("sort_order").notNull().default(0),
 });
 
+// ── Events / Calendar ──────────────────────────────────────────────────────────
+
+export const events = sqliteTable("events", {
+  id:          integer("id").primaryKey({ autoIncrement: true }),
+  title:       text("title").notNull(),
+  date:        text("date").notNull(),         // YYYY-MM-DD
+  end_date:    text("end_date"),               // optional, for multi-day spans
+  time:        text("time"),                   // "HH:MM" optional
+  category:    text("category").notNull().default("other"), // date|trip|anniversary|concert|birthday|reminder|other
+  notes:       text("notes"),
+  created_by:  text("created_by").notNull(),   // "jack"|"sally"|"together"
+  created_at:  text("created_at").notNull().default(""),
+});
+
+export const insertEventSchema = createInsertSchema(events).omit({ id: true, created_at: true });
+export type Event = typeof events.$inferSelect;
+export type InsertEvent = typeof events.$inferInsert;
+
 export const insertGroceryListSchema = createInsertSchema(groceryLists).omit({ id: true, created_at: true });
 export const insertGroceryItemSchema = createInsertSchema(groceryItems).omit({ id: true });
 
