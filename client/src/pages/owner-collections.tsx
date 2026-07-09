@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient, useQueries } from "@tanstack/react-query";
 import { apiRequest, API_BASE, getAuthToken } from "@/lib/queryClient";
 import type { Collection, Item } from "@shared/schema";
@@ -266,7 +266,7 @@ function AddToCollectionDialog({
 
 type SortMode = "recent" | "title" | "rating" | "year";
 
-function LibraryMirror({ owner, ownerCollections, mediaGroup }: { owner: string; ownerCollections: Collection[]; mediaGroup: "anime" | "book" | "podcast" }) {
+function LibraryMirror({ owner, ownerCollections, mediaGroup, itemsByColId }: { owner: string; ownerCollections: Collection[]; mediaGroup: "anime" | "book" | "podcast"; itemsByColId: Record<number, any[]> }) {
   const { data: allItems } = useQuery<Item[]>({ queryKey: ["/api/items"] });
   const [search, setSearch] = useState("");
   const [addTarget, setAddTarget] = useState<Item | null>(null);
@@ -274,6 +274,24 @@ function LibraryMirror({ owner, ownerCollections, mediaGroup }: { owner: string;
   const [subTypeFilter, setSubTypeFilter] = useState<string>("all");
   // Track locally added items for instant visual feedback (itemId → collectionId)
   const [addedItems, setAddedItems] = useState<Set<number>>(new Set());
+
+  // Build a map of itemId → [{ collectionName, status, color }] for badge display
+  const itemCollectionMap = useMemo<Record<number, Array<{ name: string; status: string; color: string }>>>(() => {
+    const map: Record<number, Array<{ name: string; status: string; color: string }>> = {};
+    ownerCollections.forEach(col => {
+      const items = itemsByColId[col.id] ?? [];
+      items.forEach((it: any) => {
+        if (!map[it.id]) map[it.id] = [];
+        const status = it.collectionStatus ?? "";
+        map[it.id].push({
+          name: col.name,
+          status,
+          color: STATUS_COLORS[status] ?? "hsl(220 8% 55%)",
+        });
+      });
+    });
+    return map;
+  }, [ownerCollections, itemsByColId]);
   const { toast } = useToast();
   const qc = useQueryClient();
 
@@ -408,6 +426,8 @@ function LibraryMirror({ owner, ownerCollections, mediaGroup }: { owner: string;
         <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-7 gap-2">
           {filtered.map((item) => {
             const isAdded = addedItems.has(item.id);
+            const existingCollections = itemCollectionMap[item.id] ?? [];
+            const isInAny = existingCollections.length > 0 || isAdded;
             return (
               <button
                 key={item.id}
@@ -415,7 +435,7 @@ function LibraryMirror({ owner, ownerCollections, mediaGroup }: { owner: string;
                 onClick={() => setAddTarget(item)}
                 className={cn(
                   "group relative rounded-lg overflow-hidden bg-card border transition-all duration-200 text-left",
-                  isAdded
+                  isInAny
                     ? "border-primary/60 shadow-[0_0_0_1px_hsl(var(--primary)/0.3)]"
                     : "border-border hover:border-primary/50 hover:shadow-lg"
                 )}
@@ -435,12 +455,43 @@ function LibraryMirror({ owner, ownerCollections, mediaGroup }: { owner: string;
                       {Icon(item.mediaType)}
                     </div>
                   )}
-                  {/* Added badge */}
+
+                  {/* Status badges — top-left stack showing which collections item is in */}
+                  {existingCollections.length > 0 && (
+                    <div className="absolute top-1 left-1 flex flex-col gap-0.5">
+                      {existingCollections.slice(0, 3).map((ec, i) => (
+                        <div
+                          key={i}
+                          className="flex items-center gap-0.5 px-1 py-0.5 rounded text-[8px] font-bold leading-none shadow-sm"
+                          style={{
+                            background: `${ec.color}dd`,
+                            color: "white",
+                            maxWidth: "52px",
+                          }}
+                          title={`${ec.name} — ${STATUS_LABELS[ec.status] ?? ec.status}`}
+                        >
+                          <span
+                            className="w-1.5 h-1.5 rounded-full shrink-0"
+                            style={{ background: "rgba(255,255,255,0.7)" }}
+                          />
+                          <span className="truncate">{STATUS_LABELS[ec.status] ?? ec.status}</span>
+                        </div>
+                      ))}
+                      {existingCollections.length > 3 && (
+                        <div className="px-1 py-0.5 rounded text-[8px] font-bold leading-none bg-black/60 text-white/80">
+                          +{existingCollections.length - 3}
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Locally-just-added check badge — top-right */}
                   {isAdded && (
                     <div className="absolute top-1 right-1 w-4 h-4 rounded-full bg-primary flex items-center justify-center shadow-md">
                       <Check size={9} className="text-white" />
                     </div>
                   )}
+
                   {/* Add overlay on hover */}
                   <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-colors duration-200 flex items-center justify-center">
                     <Plus
@@ -741,26 +792,28 @@ export default function OwnerCollectionsPage({ owner }: { owner: string }) {
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <Button
+          <button
             onClick={() => setShowMirror(v => !v)}
-            size="sm"
-            variant="outline"
             data-testid="button-toggle-mirror"
-            className="gap-1.5 text-xs"
+            title={showMirror ? "Hide library" : "Add from library"}
+            className={cn(
+              "w-9 h-9 flex items-center justify-center rounded-xl border transition-all duration-200",
+              showMirror
+                ? "bg-primary/15 border-primary/40 text-primary"
+                : "border-border text-muted-foreground hover:border-primary/40 hover:text-foreground hover:bg-secondary"
+            )}
           >
-            <BookOpen size={13} />
-            {showMirror ? "Hide library" : "Add from library"}
-          </Button>
-          <Button
+            <BookOpen size={16} />
+          </button>
+          <button
             onClick={() => { setActiveTab("custom"); setCreateOpen(true); }}
-            size="sm"
             data-testid="button-new-collection"
-            className="gap-1.5 text-white border-none"
+            title="New collection"
+            className="w-9 h-9 flex items-center justify-center rounded-xl text-white border-none transition-all duration-200 hover:opacity-90 active:scale-95"
             style={{ background: meta.accent, boxShadow: `0 2px 12px ${meta.accent}55` }}
           >
-            <Plus size={14} />
-            New
-          </Button>
+            <Plus size={16} />
+          </button>
         </div>
       </div>
 
@@ -790,6 +843,7 @@ export default function OwnerCollectionsPage({ owner }: { owner: string }) {
             owner={owner}
             mediaGroup={mirrorMediaGroup}
             ownerCollections={mirrorOwnerCols}
+            itemsByColId={itemsByColId}
           />
         </div>
       )}

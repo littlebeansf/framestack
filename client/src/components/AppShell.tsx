@@ -320,13 +320,26 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
       {/* Main */}
       <div className="flex-1 flex flex-col min-w-0 relative z-10">
         <header className="md:hidden flex items-center justify-between px-4 py-3 border-b border-border bg-background/95 backdrop-blur sticky top-0 z-30">
+          {/* Hamburger + active-space emoji pill */}
           <button
             onClick={() => setSidebarOpen(true)}
             data-testid="button-mobile-menu"
-            className="p-1.5 rounded-lg hover:bg-secondary transition-transform active:scale-90"
+            className="flex items-center gap-1.5 p-1.5 rounded-lg hover:bg-secondary transition-transform active:scale-90"
             aria-label="Open menu"
           >
             <Menu size={20} />
+            {/* Show the active space emoji so user knows where they are */}
+            {(() => {
+              const active = NAV_ITEMS.find(item => isActive(item.href));
+              return active ? (
+                <span
+                  className="text-base leading-none w-6 h-6 flex items-center justify-center rounded-md"
+                  style={{ background: `${active.accent}22` }}
+                >
+                  {active.emoji}
+                </span>
+              ) : null;
+            })()}
           </button>
           <Logo />
           <button
