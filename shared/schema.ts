@@ -95,7 +95,7 @@ export const STATUS_LABELS: Record<string, string> = {
   want_to_rewatch: "Want to Rewatch",
   dropped: "Dropped",
   // Book/Manga
-  wishlist: "Wishlist",
+  wishlist: "Wishlist",  // podcast only — for manga/book the collection is renamed to "To Buy"
   owned: "Owned",
   reading: "Reading",
   // Podcast
@@ -345,19 +345,19 @@ export const DEFAULT_COLLECTIONS: Array<{
   { name: "Want to Read",    description: "Manga I want to read",                  mediaGroup: "manga",  defaultStatus: "want_to_watch" },
   { name: "Reading",         description: "Manga I'm currently reading",           mediaGroup: "manga",  defaultStatus: "reading" },
   { name: "Completed",       description: "Manga I finished",                      mediaGroup: "manga",  defaultStatus: "completed" },
-  { name: "Wishlist",        description: "Manga I want to read",                  mediaGroup: "manga",  defaultStatus: "wishlist" },
+  { name: "To Buy",          description: "Manga I want to buy or acquire",        mediaGroup: "manga",  defaultStatus: "wishlist" },
   { name: "Owned",           description: "Manga I own but haven't started",       mediaGroup: "manga",  defaultStatus: "owned" },
   // ── Book
   { name: "Want to Read",    description: "Books I want to read",                  mediaGroup: "book",   defaultStatus: "want_to_watch" },
   { name: "Reading",         description: "Books I'm currently reading",           mediaGroup: "book",   defaultStatus: "reading" },
   { name: "Completed",       description: "Books I finished",                      mediaGroup: "book",   defaultStatus: "completed" },
-  { name: "Wishlist",        description: "Books I want to read",                  mediaGroup: "book",   defaultStatus: "wishlist" },
+  { name: "To Buy",          description: "Books I want to buy or acquire",        mediaGroup: "book",   defaultStatus: "wishlist" },
   { name: "Owned",           description: "Books I own but haven't started",       mediaGroup: "book",   defaultStatus: "owned" },
   // ── Podcast
   { name: "Want to Listen",  description: "Podcasts I want to listen to",          mediaGroup: "podcast", defaultStatus: "want_to_watch" },
   { name: "Listening",       description: "Podcasts I'm currently listening to",   mediaGroup: "podcast", defaultStatus: "listening" },
   { name: "Completed",       description: "Podcasts I finished",                   mediaGroup: "podcast", defaultStatus: "completed" },
-  { name: "Wishlist",        description: "Podcasts I want to listen to",          mediaGroup: "podcast", defaultStatus: "wishlist" },
+  { name: "Saved",           description: "Podcasts saved for later",               mediaGroup: "podcast", defaultStatus: "wishlist" },
   { name: "Dropped",         description: "Podcasts I stopped listening to",       mediaGroup: "podcast", defaultStatus: "dropped" },
 ];
 

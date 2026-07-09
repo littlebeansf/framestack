@@ -1,4 +1,4 @@
-import { eq, and, desc } from "drizzle-orm";
+import { eq, and, desc, sql } from "drizzle-orm";
 import {
   users, items, collections, collectionItems, profiles, links, linkLists, secretMessages, quotes, restaurants, dailyMoods,
   groceryLists, groceryItems, events,
@@ -305,6 +305,32 @@ function seedDefaultCollections() {
   }
 }
 seedDefaultCollections();
+
+// ─── Migration: rename legacy "Wishlist" default collections ──────────────────────
+// "Wishlist" → "To Buy" for manga/book; "Wishlist" → "Saved" for podcast.
+// Runs every boot but only updates rows that still have the old name.
+try {
+  db.update(collections)
+    .set({ name: "To Buy" })
+    .where(and(
+      eq(collections.isDefault, true),
+      eq(collections.name, "Wishlist"),
+      eq(collections.defaultStatus, "wishlist"),
+      // manga or book
+      sql`${collections.mediaGroup} IN ('manga', 'book')`,
+    )).run();
+
+  db.update(collections)
+    .set({ name: "Saved" })
+    .where(and(
+      eq(collections.isDefault, true),
+      eq(collections.name, "Wishlist"),
+      eq(collections.defaultStatus, "wishlist"),
+      eq(collections.mediaGroup, "podcast"),
+    )).run();
+} catch (e) {
+  console.warn("[migration] wishlist rename failed:", e);
+}
 
 // ─── Migration: fix items misplaced in broad-group collections ─────────────────────
 // Old scheme used mediaGroup="anime" for anime/movie/series and
