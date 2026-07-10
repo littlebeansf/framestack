@@ -36,35 +36,49 @@ async function searchViaBackend(q: string, type: string): Promise<SearchResult[]
 // ── Direct browser fallbacks (used on GitHub Pages / when backend unreachable) ─
 
 async function searchAnimeDirect(q: string): Promise<SearchResult[]> {
+  // AniList GraphQL — reliable, no key needed, no MAL dependency
   try {
-    const r = await fetch(`https://api.jikan.moe/v4/anime?q=${encodeURIComponent(q)}&limit=10&sfw=true`);
-    if (!r.ok) return [];
+    const query = `query($q:String){Page(perPage:12){media(search:$q,type:ANIME,sort:SEARCH_MATCH){id title{english romaji}coverImage{large}startDate{year}episodes genres studios(isMain:true){nodes{name}}}}}`;
+    const r = await fetch("https://graphql.anilist.co", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ query, variables: { q } }),
+      signal: AbortSignal.timeout(8000),
+    });
+    if (!r.ok) throw new Error("anilist_error");
     const data = await r.json();
-    return (data.data || []).map((a: any) => ({
-      externalId: String(a.mal_id), externalSource: "jikan",
-      title: a.title_english || a.title,
-      coverUrl: a.images?.jpg?.large_image_url || a.images?.jpg?.image_url,
-      year: a.year ? String(a.year) : a.aired?.from?.split("-")[0],
+    return (data?.data?.Page?.media || []).map((a: any) => ({
+      externalId: String(a.id), externalSource: "anilist",
+      title: a.title?.english || a.title?.romaji,
+      coverUrl: a.coverImage?.large,
+      year: a.startDate?.year ? String(a.startDate.year) : undefined,
       mediaType: "anime" as const, episodes: a.episodes,
-      genres: JSON.stringify((a.genres || []).map((g: any) => g.name)),
-      studio: (a.studios || [])[0]?.name,
+      genres: JSON.stringify(a.genres || []),
+      studio: a.studios?.nodes?.[0]?.name,
     }));
   } catch { return []; }
 }
 
 async function searchMangaDirect(q: string): Promise<SearchResult[]> {
+  // AniList GraphQL — reliable, no key needed
   try {
-    const r = await fetch(`https://api.jikan.moe/v4/manga?q=${encodeURIComponent(q)}&limit=10&sfw=true`);
-    if (!r.ok) return [];
+    const query = `query($q:String){Page(perPage:12){media(search:$q,type:MANGA,sort:SEARCH_MATCH){id title{english romaji}coverImage{large}startDate{year}genres staff(perPage:3,sort:RELEVANCE){nodes{name{full}}}}}}`;
+    const r = await fetch("https://graphql.anilist.co", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ query, variables: { q } }),
+      signal: AbortSignal.timeout(8000),
+    });
+    if (!r.ok) throw new Error("anilist_error");
     const data = await r.json();
-    return (data.data || []).map((m: any) => ({
-      externalId: String(m.mal_id), externalSource: "jikan",
-      title: m.title_english || m.title,
-      coverUrl: m.images?.jpg?.large_image_url || m.images?.jpg?.image_url,
-      year: m.published?.from?.split("-")[0],
+    return (data?.data?.Page?.media || []).map((m: any) => ({
+      externalId: String(m.id), externalSource: "anilist",
+      title: m.title?.english || m.title?.romaji,
+      coverUrl: m.coverImage?.large,
+      year: m.startDate?.year ? String(m.startDate.year) : undefined,
       mediaType: "manga" as const,
-      genres: JSON.stringify((m.genres || []).map((g: any) => g.name)),
-      author: (m.authors || [])[0]?.name,
+      genres: JSON.stringify(m.genres || []),
+      author: m.staff?.nodes?.[0]?.name?.full,
     }));
   } catch { return []; }
 }

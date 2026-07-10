@@ -197,19 +197,25 @@ export async function registerRoutes(httpServer: Server, app: Express) {
   app.get("/api/search/anime", async (req, res) => {
     try {
       const { q } = req.query;
-      await new Promise(r => setTimeout(r, 350));
-      const r = await fetch(`https://api.jikan.moe/v4/anime?q=${encodeURIComponent(String(q))}&limit=10&sfw=true`, { signal: AbortSignal.timeout(8000) as any });
+      const gql = `query($q:String){Page(perPage:12){media(search:$q,type:ANIME,sort:SEARCH_MATCH){id title{english romaji}coverImage{large}startDate{year}episodes genres studios(isMain:true){nodes{name}}}}}`;
+      const r = await fetch("https://graphql.anilist.co", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ query: gql, variables: { q: String(q) } }),
+        signal: AbortSignal.timeout(8000) as any,
+      });
       if (!r.ok) return res.status(502).json({ error: "upstream_error" });
       const data = await r.json() as any;
-      if (!data.data) return res.status(502).json({ error: "no_data" });
-      res.json(data.data.map((a: any) => ({
-        externalId: String(a.mal_id), externalSource: "jikan",
-        title: a.title_english || a.title,
-        coverUrl: a.images?.jpg?.large_image_url || a.images?.jpg?.image_url,
-        year: a.year ? String(a.year) : a.aired?.from?.split("-")[0],
+      const media = data?.data?.Page?.media;
+      if (!media) return res.status(502).json({ error: "no_data" });
+      res.json(media.map((a: any) => ({
+        externalId: String(a.id), externalSource: "anilist",
+        title: a.title?.english || a.title?.romaji,
+        coverUrl: a.coverImage?.large,
+        year: a.startDate?.year ? String(a.startDate.year) : undefined,
         mediaType: "anime", episodes: a.episodes,
-        genres: JSON.stringify((a.genres || []).map((g: any) => g.name)),
-        studio: (a.studios || [])[0]?.name,
+        genres: JSON.stringify(a.genres || []),
+        studio: a.studios?.nodes?.[0]?.name,
       })));
     } catch { res.status(502).json({ error: "upstream_unreachable" }); }
   });
@@ -217,19 +223,25 @@ export async function registerRoutes(httpServer: Server, app: Express) {
   app.get("/api/search/manga", async (req, res) => {
     try {
       const { q } = req.query;
-      await new Promise(r => setTimeout(r, 350));
-      const r = await fetch(`https://api.jikan.moe/v4/manga?q=${encodeURIComponent(String(q))}&limit=10&sfw=true`, { signal: AbortSignal.timeout(8000) as any });
+      const gql = `query($q:String){Page(perPage:12){media(search:$q,type:MANGA,sort:SEARCH_MATCH){id title{english romaji}coverImage{large}startDate{year}genres staff(perPage:3,sort:RELEVANCE){nodes{name{full}}}}}}`;
+      const r = await fetch("https://graphql.anilist.co", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ query: gql, variables: { q: String(q) } }),
+        signal: AbortSignal.timeout(8000) as any,
+      });
       if (!r.ok) return res.status(502).json({ error: "upstream_error" });
       const data = await r.json() as any;
-      if (!data.data) return res.status(502).json({ error: "no_data" });
-      res.json(data.data.map((m: any) => ({
-        externalId: String(m.mal_id), externalSource: "jikan",
-        title: m.title_english || m.title,
-        coverUrl: m.images?.jpg?.large_image_url || m.images?.jpg?.image_url,
-        year: m.published?.from?.split("-")[0],
+      const media = data?.data?.Page?.media;
+      if (!media) return res.status(502).json({ error: "no_data" });
+      res.json(media.map((m: any) => ({
+        externalId: String(m.id), externalSource: "anilist",
+        title: m.title?.english || m.title?.romaji,
+        coverUrl: m.coverImage?.large,
+        year: m.startDate?.year ? String(m.startDate.year) : undefined,
         mediaType: "manga",
-        genres: JSON.stringify((m.genres || []).map((g: any) => g.name)),
-        author: (m.authors || [])[0]?.name,
+        genres: JSON.stringify(m.genres || []),
+        author: m.staff?.nodes?.[0]?.name?.full,
       })));
     } catch { res.status(502).json({ error: "upstream_unreachable" }); }
   });
