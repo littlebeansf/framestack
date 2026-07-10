@@ -198,10 +198,11 @@ export async function registerRoutes(httpServer: Server, app: Express) {
     try {
       const { q } = req.query;
       await new Promise(r => setTimeout(r, 350));
-      const r = await fetch(`https://api.jikan.moe/v4/anime?q=${encodeURIComponent(String(q))}&limit=10&sfw=true`);
-      if (!r.ok) return res.json([]);
+      const r = await fetch(`https://api.jikan.moe/v4/anime?q=${encodeURIComponent(String(q))}&limit=10&sfw=true`, { signal: AbortSignal.timeout(8000) as any });
+      if (!r.ok) return res.status(502).json({ error: "upstream_error" });
       const data = await r.json() as any;
-      res.json((data.data || []).map((a: any) => ({
+      if (!data.data) return res.status(502).json({ error: "no_data" });
+      res.json(data.data.map((a: any) => ({
         externalId: String(a.mal_id), externalSource: "jikan",
         title: a.title_english || a.title,
         coverUrl: a.images?.jpg?.large_image_url || a.images?.jpg?.image_url,
@@ -210,17 +211,18 @@ export async function registerRoutes(httpServer: Server, app: Express) {
         genres: JSON.stringify((a.genres || []).map((g: any) => g.name)),
         studio: (a.studios || [])[0]?.name,
       })));
-    } catch (err: any) { res.status(500).json({ error: err.message }); }
+    } catch { res.status(502).json({ error: "upstream_unreachable" }); }
   });
 
   app.get("/api/search/manga", async (req, res) => {
     try {
       const { q } = req.query;
       await new Promise(r => setTimeout(r, 350));
-      const r = await fetch(`https://api.jikan.moe/v4/manga?q=${encodeURIComponent(String(q))}&limit=10&sfw=true`);
-      if (!r.ok) return res.json([]);
+      const r = await fetch(`https://api.jikan.moe/v4/manga?q=${encodeURIComponent(String(q))}&limit=10&sfw=true`, { signal: AbortSignal.timeout(8000) as any });
+      if (!r.ok) return res.status(502).json({ error: "upstream_error" });
       const data = await r.json() as any;
-      res.json((data.data || []).map((m: any) => ({
+      if (!data.data) return res.status(502).json({ error: "no_data" });
+      res.json(data.data.map((m: any) => ({
         externalId: String(m.mal_id), externalSource: "jikan",
         title: m.title_english || m.title,
         coverUrl: m.images?.jpg?.large_image_url || m.images?.jpg?.image_url,
@@ -229,16 +231,16 @@ export async function registerRoutes(httpServer: Server, app: Express) {
         genres: JSON.stringify((m.genres || []).map((g: any) => g.name)),
         author: (m.authors || [])[0]?.name,
       })));
-    } catch (err: any) { res.status(500).json({ error: err.message }); }
+    } catch { res.status(502).json({ error: "upstream_unreachable" }); }
   });
 
   app.get("/api/search/movie", async (req, res) => {
     try {
       const { q } = req.query;
       const r = await fetch(`https://imdb.iamidiotareyoutoo.com/search?q=${encodeURIComponent(String(q))}`, { signal: AbortSignal.timeout(8000) as any });
-      if (!r.ok) return res.json([]);
+      if (!r.ok) return res.status(502).json({ error: 'upstream_error' });
       const data = await r.json() as any;
-      if (!data.ok || !Array.isArray(data.description)) return res.json([]);
+      if (!data.ok || !Array.isArray(data.description)) return res.status(502).json({ error: 'no_data' });
       res.json(data.description.slice(0, 12).map((m: any) => ({
         externalId: m["#IMDB_ID"], externalSource: "imdb",
         title: m["#TITLE"], coverUrl: m["#IMG_POSTER"] || null,
@@ -251,8 +253,8 @@ export async function registerRoutes(httpServer: Server, app: Express) {
   app.get("/api/search/series", async (req, res) => {
     try {
       const { q } = req.query;
-      const r = await fetch(`https://api.tvmaze.com/search/shows?q=${encodeURIComponent(String(q))}`);
-      if (!r.ok) return res.json([]);
+      const r = await fetch(`https://api.tvmaze.com/search/shows?q=${encodeURIComponent(String(q))}`, { signal: AbortSignal.timeout(8000) as any });
+      if (!r.ok) return res.status(502).json({ error: 'upstream_error' });
       const data = await r.json() as any[];
       res.json(data.slice(0, 12).map(({ show }: any) => ({
         externalId: String(show.id), externalSource: "tvmaze",
