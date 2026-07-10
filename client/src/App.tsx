@@ -246,7 +246,6 @@ export default function App() {
             {/* Catalogs group */}
             <Route path="/together/catalogs">{() => <TogetherPage sub="catalogs" />}</Route>
             <Route path="/together/links">{() => <TogetherPage sub="links" />}</Route>
-            <Route path="/together/eats">{() => <TogetherPage sub="eats" />}</Route>
             <Route path="/together/places">{() => <TogetherPage sub="places" />}</Route>
             {/* Activities group */}
             <Route path="/together/activities">{() => <TogetherPage sub="activities" />}</Route>

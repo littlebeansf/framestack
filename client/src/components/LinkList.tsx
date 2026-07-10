@@ -75,6 +75,32 @@ function IconBadge({ icon }: { icon: string }) {
 
 type SortDir = "asc" | "desc" | "recent";
 
+// ── Sort persistence (module-level + sessionStorage) ────────────────────────
+const SORT_KEY_LIST = "fs_listSort";
+const SORT_KEY_LINK = "fs_linkSort";
+function _readSort(key: string, fallback: SortDir): SortDir {
+  try {
+    const v = sessionStorage.getItem(key);
+    if (v === "recent" || v === "asc" || v === "desc") return v as SortDir;
+  } catch {}
+  return fallback;
+}
+function _writeSort(key: string, val: SortDir) {
+  try { sessionStorage.setItem(key, val); } catch {}
+}
+let _listSortCache: SortDir | null = null;
+let _linkSortCache: SortDir | null = null;
+function getListSort(): SortDir {
+  if (_listSortCache) return _listSortCache;
+  return (_listSortCache = _readSort(SORT_KEY_LIST, "recent"));
+}
+function setListSortPersist(v: SortDir) { _listSortCache = v; _writeSort(SORT_KEY_LIST, v); }
+function getLinkSort(): SortDir {
+  if (_linkSortCache) return _linkSortCache;
+  return (_linkSortCache = _readSort(SORT_KEY_LINK, "recent"));
+}
+function setLinkSortPersist(v: SortDir) { _linkSortCache = v; _writeSort(SORT_KEY_LINK, v); }
+
 function SortToggle({ sort, onToggle }: { sort: SortDir; onToggle: () => void }) {
   return (
     <button
@@ -474,7 +500,7 @@ function LinksPanel({
 
   const qc = useQueryClient();
   const { toast } = useToast();
-  const [linkSort, setLinkSort] = useState<SortDir>("recent");
+  const [linkSort, setLinkSort] = useState<SortDir>(getLinkSort);
 
   const linksKey = ["/api/link-lists", list.id, "links"];
 
@@ -542,7 +568,7 @@ function LinksPanel({
         )}
         <SortToggle
           sort={linkSort}
-          onToggle={() => setLinkSort(s => s === "recent" ? "asc" : s === "asc" ? "desc" : "recent")}
+          onToggle={() => setLinkSort(s => { const n = s === "recent" ? "asc" : s === "asc" ? "desc" : "recent"; setLinkSortPersist(n); return n; })}
         />
       </div>
 
@@ -855,7 +881,7 @@ export default function LinkList() {
   const [editingId, setEditingId] = useState<number | null>(null);
   // Mobile: null = lists view, number = links view
   const [mobileView, setMobileView] = useState<"lists" | "links">("lists");
-  const [listSort, setListSort] = useState<SortDir>("recent");
+  const [listSort, setListSort] = useState<SortDir>(getListSort);
 
   const listsKey = ["/api/link-lists"];
 
@@ -946,7 +972,7 @@ export default function LinkList() {
             onEdit={id => { setSelectedId(id); setEditingId(id); }}
             onDelete={id => deleteMutation.mutate(id)}
             onLockToggle={handleLockToggle}
-            onSortToggle={() => setListSort(s => s === "recent" ? "asc" : s === "asc" ? "desc" : "recent")}
+            onSortToggle={() => setListSort(s => { const n = s === "recent" ? "asc" : s === "asc" ? "desc" : "recent"; setListSortPersist(n); return n; })}
             onEditDone={() => setEditingId(null)}
             onCreate={(name, emoji) => createMutation.mutate({ name, emoji: emoji || null, createdAt: Date.now() })}
           />
@@ -973,7 +999,7 @@ export default function LinkList() {
             onEdit={id => { setSelectedId(id); setEditingId(id); }}
             onDelete={id => deleteMutation.mutate(id)}
             onLockToggle={handleLockToggle}
-            onSortToggle={() => setListSort(s => s === "recent" ? "asc" : s === "asc" ? "desc" : "recent")}
+            onSortToggle={() => setListSort(s => { const n = s === "recent" ? "asc" : s === "asc" ? "desc" : "recent"; setListSortPersist(n); return n; })}
             onEditDone={() => setEditingId(null)}
             onCreate={(name, emoji) => createMutation.mutate({ name, emoji: emoji || null, createdAt: Date.now() })}
           />

@@ -4,7 +4,6 @@ import OwnerProfilePage from "./owner-profile";
 import OwnerCollectionsPage from "./owner-collections";
 import OwnerIntro from "@/components/OwnerIntro";
 import LinkList from "@/components/LinkList";
-import RestaurantTracker from "@/components/RestaurantTracker";
 import GroceryTab from "@/components/GroceryTab";
 import CalendarTab from "@/components/CalendarTab";
 import PlacesTab from "@/components/PlacesTab";
@@ -30,7 +29,7 @@ import { cn } from "@/lib/utils";
 const ACCENT = "hsl(20 90% 60%)";
 
 type TopTab = "space" | "catalogs" | "activities";
-type CatalogSub = "watchlists" | "links" | "eats" | "places";
+type CatalogSub = "watchlists" | "links" | "places";
 type ActivitySub = "calendar" | "grocery";
 
 // Derive active tabs from `sub` string passed from App.tsx
@@ -38,14 +37,13 @@ function parseSub(sub?: string): { top: TopTab; cat: CatalogSub; act: ActivitySu
   if (!sub || sub === "profile") return { top: "space", cat: "watchlists", act: "calendar" };
   if (sub === "catalogs")         return { top: "catalogs", cat: "watchlists", act: "calendar" };
   if (sub === "links")            return { top: "catalogs", cat: "links", act: "calendar" };
-  if (sub === "eats")             return { top: "catalogs", cat: "eats", act: "calendar" };
   if (sub === "places")           return { top: "catalogs", cat: "places", act: "calendar" };
   if (sub === "activities")       return { top: "activities", cat: "watchlists", act: "calendar" };
   if (sub === "grocery")          return { top: "activities", cat: "watchlists", act: "grocery" };
   if (sub === "calendar")         return { top: "activities", cat: "watchlists", act: "calendar" };
   // Legacy: keep old /together/collections working
   if (sub === "collections")      return { top: "catalogs", cat: "watchlists", act: "calendar" };
-  if (sub === "restaurants")      return { top: "catalogs", cat: "eats", act: "calendar" };
+  if (sub === "restaurants")      return { top: "catalogs", cat: "places", act: "calendar" };
   return { top: "space", cat: "watchlists", act: "calendar" };
 }
 
@@ -126,7 +124,6 @@ export default function TogetherPage({ sub }: { sub?: string }) {
   const CATALOG_TABS: { id: CatalogSub; label: string }[] = [
     { id: "watchlists", label: "Watchlists" },
     { id: "links",      label: "Link Lists" },
-    { id: "eats",       label: "Eats" },
     { id: "places",     label: "Places" },
   ];
 
@@ -173,7 +170,6 @@ export default function TogetherPage({ sub }: { sub?: string }) {
         {top === "space"      && <OwnerProfilePage owner="together" />}
         {top === "catalogs"   && cat === "watchlists" && <OwnerCollectionsPage owner="together" />}
         {top === "catalogs"   && cat === "links"      && <LinkList />}
-        {top === "catalogs"   && cat === "eats"       && <RestaurantTracker />}
         {top === "catalogs"   && cat === "places"     && <PlacesTab />}
         {top === "activities" && act === "calendar"   && <CalendarTab />}
         {top === "activities" && act === "grocery"    && <GroceryTab />}
