@@ -410,13 +410,68 @@ function AddLinkForm({ listId, onAdded }: { listId: number; onAdded: (link: Link
 
 // ── Links panel (right pane / full-screen on mobile) ──────────────────────────
 
-function LinksPanel({
+
+function ListLockScreen({
   list,
+  onUnlock,
   onBack,
 }: {
   list: LinkListType;
-  onBack?: () => void; // mobile only
+  onUnlock: () => void;
+  onBack?: () => void;
 }) {
+  return (
+    <div className="flex flex-col h-full">
+      {onBack && (
+        <button
+          onClick={onBack}
+          className="mb-4 w-8 h-8 rounded-lg flex items-center justify-center text-muted-foreground hover:bg-secondary active:bg-secondary transition-colors flex-shrink-0 md:hidden"
+          aria-label="Back to lists"
+        >
+          <ArrowLeft size={16} />
+        </button>
+      )}
+      <div className="flex flex-col items-center justify-center flex-1 gap-5 select-none">
+        <div
+          className="w-20 h-20 rounded-3xl flex items-center justify-center"
+          style={{ background: "#f59e0b18", border: "1.5px solid #f59e0b44" }}
+        >
+          <Lock size={36} style={{ color: "#f59e0b" }} />
+        </div>
+        <div className="text-center">
+          <p className="text-base font-bold text-foreground mb-1">
+            {list.emoji ?? "\u{1F517}"} {list.name}
+          </p>
+          <p className="text-sm text-muted-foreground">This list is locked</p>
+        </div>
+        <button
+          data-testid={`button-unlock-list-${list.id}`}
+          onClick={onUnlock}
+          className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold transition-all hover:opacity-90 active:scale-95"
+          style={{ background: "#f59e0b", color: "white" }}
+        >
+          <LockOpen size={15} />
+          Unlock list
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function LinksPanel({
+  list,
+  onBack,
+  onUnlock,
+}: {
+  list: LinkListType;
+  onBack?: () => void; // mobile only
+  onUnlock: () => void;
+}) {
+  const listLocked = (list as any).locked === 1;
+  if (listLocked) {
+    return <ListLockScreen list={list} onUnlock={onUnlock} onBack={onBack} />;
+  }
+
   const qc = useQueryClient();
   const { toast } = useToast();
   const [linkSort, setLinkSort] = useState<SortDir>("recent");
@@ -617,6 +672,7 @@ function ListsSidebar({
   onSelect,
   onEdit,
   onDelete,
+  onLockToggle,
   onSortToggle,
   onEditDone,
   onCreate,
@@ -630,6 +686,7 @@ function ListsSidebar({
   onSelect: (id: number) => void;
   onEdit: (id: number) => void;
   onDelete: (id: number) => void;
+  onLockToggle: (id: number, currentLocked: number) => void;
   onSortToggle: () => void;
   onEditDone: () => void;
   onCreate: (name: string, emoji: string) => void;
@@ -699,6 +756,7 @@ function ListsSidebar({
         {!listsLoading && lists.map(list => {
           const active = list.id === selectedId;
           const isEditing = editingId === list.id;
+          const listLocked = (list as any).locked === 1;
 
           return (
             <div
@@ -708,6 +766,8 @@ function ListsSidebar({
               style={
                 active
                   ? { background: `${ACCENT}22`, border: `1px solid ${ACCENT}55` }
+                  : listLocked
+                  ? { border: "1px solid hsl(var(--border))", opacity: 0.75 }
                   : { border: "1px solid transparent" }
               }
               onClick={() => { if (!isEditing) onSelect(list.id); }}
@@ -720,15 +780,28 @@ function ListsSidebar({
                 />
               ) : (
                 <>
-                  <span className="text-lg leading-none flex-shrink-0">{list.emoji ?? "🔗"}</span>
+                  <span className="text-lg leading-none flex-shrink-0">
+                    {listLocked ? "🔒" : (list.emoji ?? "🔗")}
+                  </span>
                   <span
                     className="flex-1 text-sm font-semibold truncate"
-                    style={active ? { color: ACCENT } : {}}
+                    style={active ? { color: ACCENT } : listLocked ? { color: "hsl(var(--muted-foreground))" } : {}}
                   >
                     {list.name}
                   </span>
                   <ChevronRight size={13} className="flex-shrink-0 text-muted-foreground opacity-40" />
-                  {/* Action buttons — always shown on mobile (touch), hover on desktop */}
+                  {/* Lock toggle button */}
+                  <button
+                    data-testid={`button-lock-list-${list.id}`}
+                    onClick={e => { e.stopPropagation(); onLockToggle(list.id, (list as any).locked ?? 0); }}
+                    className="w-8 h-8 rounded-md flex items-center justify-center transition-colors opacity-100 md:opacity-0 md:group-hover:opacity-100 flex-shrink-0"
+                    style={listLocked ? { color: "#f59e0b", background: "#f59e0b18" } : { color: "hsl(var(--muted-foreground))" }}
+                    aria-label={listLocked ? "Unlock list" : "Lock list"}
+                    title={listLocked ? "Unlock list" : "Lock entire list"}
+                  >
+                    {listLocked ? <Lock size={12} /> : <LockOpen size={12} />}
+                  </button>
+                  {/* Edit / delete buttons */}
                   <button
                     data-testid={`button-edit-list-${list.id}`}
                     onClick={e => { e.stopPropagation(); onEdit(list.id); }}
@@ -810,6 +883,29 @@ export default function LinkList() {
     },
   });
 
+
+  const lockListMutation = useMutation({
+    mutationFn: ({ id, locked }: { id: number; locked: number }) =>
+      apiRequest("PATCH", `/api/link-lists/${id}`, { locked }),
+    onSuccess: async (res) => {
+      const updated: LinkListType = await res.json();
+      qc.setQueryData(listsKey, (old: LinkListType[] = []) =>
+        old.map(l => l.id === updated.id ? updated : l)
+      );
+      const isLocked = (updated as any).locked === 1;
+      toast({ title: isLocked ? "List locked" : "List unlocked" });
+    },
+    onError: () => toast({ title: "Failed to update lock", variant: "destructive" }),
+  });
+
+  function handleLockToggle(id: number, currentLocked: number) {
+    lockListMutation.mutate({ id, locked: currentLocked === 1 ? 0 : 1 });
+  }
+
+  function handleUnlock(id: number) {
+    lockListMutation.mutate({ id, locked: 0 });
+  }
+
   function handleSelect(id: number) {
     setSelectedId(id);
     setMobileView("links");
@@ -835,12 +931,13 @@ export default function LinkList() {
             onSelect={handleSelect}
             onEdit={id => { setSelectedId(id); setEditingId(id); }}
             onDelete={id => deleteMutation.mutate(id)}
+            onLockToggle={handleLockToggle}
             onSortToggle={() => setListSort(s => s === "recent" ? "asc" : s === "asc" ? "desc" : "recent")}
             onEditDone={() => setEditingId(null)}
             onCreate={(name, emoji) => createMutation.mutate({ name, emoji: emoji || null, createdAt: Date.now() })}
           />
         ) : (
-          <LinksPanel list={selectedList} onBack={handleBack} />
+          <LinksPanel list={selectedList} onBack={handleBack} onUnlock={() => handleUnlock(selectedList.id)} />
         )}
       </div>
 
@@ -861,6 +958,7 @@ export default function LinkList() {
             onSelect={id => setSelectedId(id)}
             onEdit={id => { setSelectedId(id); setEditingId(id); }}
             onDelete={id => deleteMutation.mutate(id)}
+            onLockToggle={handleLockToggle}
             onSortToggle={() => setListSort(s => s === "recent" ? "asc" : s === "asc" ? "desc" : "recent")}
             onEditDone={() => setEditingId(null)}
             onCreate={(name, emoji) => createMutation.mutate({ name, emoji: emoji || null, createdAt: Date.now() })}
@@ -873,7 +971,7 @@ export default function LinkList() {
         {/* Right panel */}
         <div className="flex-1 min-w-0">
           {selectedList ? (
-            <LinksPanel list={selectedList} />
+            <LinksPanel list={selectedList} onUnlock={() => handleUnlock(selectedList.id)} />
           ) : (
             <div className="flex flex-col items-center justify-center h-full gap-3 text-center text-muted-foreground">
               <div className="w-14 h-14 rounded-2xl flex items-center justify-center" style={{ background: `${ACCENT}18` }}>

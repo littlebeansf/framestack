@@ -195,6 +195,7 @@ export const linkLists = sqliteTable("link_lists", {
   id: integer("id").primaryKey({ autoIncrement: true }),
   name: text("name").notNull(),
   emoji: text("emoji"),          // decorative emoji e.g. "🍕"
+  locked: integer("locked").notNull().default(0), // 1 = entire list hidden behind lock screen
   createdAt: integer("created_at").notNull().default(0),
 });
 

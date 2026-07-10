@@ -164,6 +164,7 @@ try { sqlite.exec(`UPDATE profiles SET avatar_emoji = '\ud83c\udfe0' WHERE owner
 // Migrate links table: add list_id column if missing, drop category if present
 try { sqlite.exec(`ALTER TABLE links ADD COLUMN list_id INTEGER NOT NULL DEFAULT 0`); } catch {}
 try { sqlite.exec(`ALTER TABLE link_lists ADD COLUMN emoji TEXT`); } catch {}
+try { sqlite.exec(`ALTER TABLE link_lists ADD COLUMN locked INTEGER NOT NULL DEFAULT 0`); } catch {}
 try { sqlite.exec(`ALTER TABLE links ADD COLUMN icon TEXT`); } catch {}
 try { sqlite.exec(`ALTER TABLE links ADD COLUMN locked INTEGER NOT NULL DEFAULT 0`); } catch {}
 // Migrate daily_moods table
