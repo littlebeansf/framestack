@@ -402,6 +402,24 @@ export const insertEventSchema = createInsertSchema(events).omit({ id: true, cre
 export type Event = typeof events.$inferSelect;
 export type InsertEvent = typeof events.$inferInsert;
 
+// Places — saved locations (linkable to calendar events)
+export const places = sqliteTable("places", {
+  id:         integer("id").primaryKey({ autoIncrement: true }),
+  name:       text("name").notNull(),
+  emoji:      text("emoji"),              // decorative e.g. "📍"
+  address:    text("address"),            // full address string
+  lat:        real("lat"),                // optional coordinates
+  lng:        real("lng"),
+  category:   text("category").notNull().default("other"), // restaurant|cafe|bar|nature|museum|shop|home|other
+  notes:      text("notes"),
+  added_by:   text("added_by").notNull().default("together"),
+  created_at: integer("created_at").notNull().default(0),
+});
+
+export const insertPlaceSchema = createInsertSchema(places).omit({ id: true });
+export type Place = typeof places.$inferSelect;
+export type InsertPlace = z.infer<typeof insertPlaceSchema>;
+
 export const insertGroceryListSchema = createInsertSchema(groceryLists).omit({ id: true, created_at: true });
 export const insertGroceryItemSchema = createInsertSchema(groceryItems).omit({ id: true });
 

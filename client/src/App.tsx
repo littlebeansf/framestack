@@ -243,11 +243,18 @@ export default function App() {
             <Route path="/sally/quotes">{() => <SallyPage sub="quotes" />}</Route>
             <Route path="/sally/messages">{() => <SallyPage sub="messages" />}</Route>
             <Route path="/together">{() => <TogetherPage sub="profile" />}</Route>
-            <Route path="/together/collections">{() => <TogetherPage sub="collections" />}</Route>
+            {/* Catalogs group */}
+            <Route path="/together/catalogs">{() => <TogetherPage sub="catalogs" />}</Route>
             <Route path="/together/links">{() => <TogetherPage sub="links" />}</Route>
-            <Route path="/together/restaurants">{() => <TogetherPage sub="restaurants" />}</Route>
-            <Route path="/together/grocery">{() => <TogetherPage sub="grocery" />}</Route>
+            <Route path="/together/eats">{() => <TogetherPage sub="eats" />}</Route>
+            <Route path="/together/places">{() => <TogetherPage sub="places" />}</Route>
+            {/* Activities group */}
+            <Route path="/together/activities">{() => <TogetherPage sub="activities" />}</Route>
             <Route path="/together/calendar">{() => <TogetherPage sub="calendar" />}</Route>
+            <Route path="/together/grocery">{() => <TogetherPage sub="grocery" />}</Route>
+            {/* Legacy redirects (keep working) */}
+            <Route path="/together/collections">{() => <TogetherPage sub="collections" />}</Route>
+            <Route path="/together/restaurants">{() => <TogetherPage sub="restaurants" />}</Route>
             <Route path="/collections/:id" component={CollectionDetailPage} />
             <Route path="/profile" component={ProfilePage} />
             <Route component={NotFound} />

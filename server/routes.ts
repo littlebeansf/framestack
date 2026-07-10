@@ -793,4 +793,37 @@ export async function registerRoutes(httpServer: Server, app: Express) {
     storage.deleteEvent(Number(req.params.id));
     res.json({ ok: true });
   });
+
+  // ── Places ───────────────────────────────────────────────────────────────
+  app.get("/api/places", (_req, res) => {
+    res.json(storage.getPlaces());
+  });
+
+  app.post("/api/places", (req, res) => {
+    const { name, emoji, address, lat, lng, category, notes, added_by } = req.body;
+    if (!name) return res.status(400).json({ error: "name required" });
+    const place = storage.createPlace({
+      name,
+      emoji: emoji ?? null,
+      address: address ?? null,
+      lat: lat ?? null,
+      lng: lng ?? null,
+      category: category ?? "other",
+      notes: notes ?? null,
+      added_by: added_by ?? "together",
+      created_at: Date.now(),
+    });
+    res.json(place);
+  });
+
+  app.patch("/api/places/:id", (req, res) => {
+    const updated = storage.updatePlace(Number(req.params.id), req.body);
+    if (!updated) return res.status(404).json({ error: "not found" });
+    res.json(updated);
+  });
+
+  app.delete("/api/places/:id", (req, res) => {
+    storage.deletePlace(Number(req.params.id));
+    res.json({ ok: true });
+  });
 }

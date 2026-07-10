@@ -1,7 +1,7 @@
 import { eq, and, desc, sql } from "drizzle-orm";
 import {
   users, items, collections, collectionItems, profiles, links, linkLists, secretMessages, quotes, restaurants, dailyMoods,
-  groceryLists, groceryItems, events,
+  groceryLists, groceryItems, events, places,
   type User, type InsertUser,
   type Item, type InsertItem,
   type Collection, type InsertCollection,
@@ -15,6 +15,7 @@ import {
   type DailyMood, type InsertDailyMood,
   type GroceryList, type GroceryItem, type InsertGroceryList, type InsertGroceryItem,
   type Event, type InsertEvent,
+  type Place, type InsertPlace,
   type ItemWithStatus,
   OWNERS, DEFAULT_COLLECTIONS,
 } from "@shared/schema";
@@ -167,6 +168,22 @@ try { sqlite.exec(`ALTER TABLE link_lists ADD COLUMN emoji TEXT`); } catch {}
 try { sqlite.exec(`ALTER TABLE link_lists ADD COLUMN locked INTEGER NOT NULL DEFAULT 0`); } catch {}
 try { sqlite.exec(`ALTER TABLE links ADD COLUMN icon TEXT`); } catch {}
 try { sqlite.exec(`ALTER TABLE links ADD COLUMN locked INTEGER NOT NULL DEFAULT 0`); } catch {}
+// Migrate places table
+try {
+  sqlite.exec(`CREATE TABLE IF NOT EXISTS places (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL,
+    emoji TEXT,
+    address TEXT,
+    lat REAL,
+    lng REAL,
+    category TEXT NOT NULL DEFAULT 'other',
+    notes TEXT,
+    added_by TEXT NOT NULL DEFAULT 'together',
+    created_at INTEGER NOT NULL DEFAULT 0
+  )`);
+} catch {}
+
 // Migrate daily_moods table
 try { sqlite.exec(`CREATE TABLE IF NOT EXISTS daily_moods (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -509,6 +526,13 @@ export interface IStorage {
   updateGroceryItem(id: number, data: Partial<InsertGroceryItem>): GroceryItem | undefined;
   deleteGroceryItem(id: number): void;
   cloneListFromTemplate(templateId: number, date: string, name: string, createdBy: string): GroceryList;
+
+  // Places
+  getPlaces(): Place[];
+  getPlace(id: number): Place | undefined;
+  createPlace(data: InsertPlace): Place;
+  updatePlace(id: number, data: Partial<InsertPlace>): Place | undefined;
+  deletePlace(id: number): void;
 }
 
 export class Storage implements IStorage {
@@ -872,6 +896,25 @@ export class Storage implements IStorage {
   }
   deleteEvent(id: number) {
     db.delete(events).where(eq(events.id, id)).run();
+  }
+
+  // ── Places ───────────────────────────────────────────────────────────────
+  getPlaces() {
+    return db.select().from(places).orderBy(desc(places.created_at)).all();
+  }
+  getPlace(id: number) {
+    return db.select().from(places).where(eq(places.id, id)).get();
+  }
+  createPlace(data: InsertPlace) {
+    return db.insert(places)
+      .values({ ...data, created_at: data.created_at ?? Date.now() })
+      .returning().get()!;
+  }
+  updatePlace(id: number, data: Partial<InsertPlace>) {
+    return db.update(places).set(data).where(eq(places.id, id)).returning().get();
+  }
+  deletePlace(id: number) {
+    db.delete(places).where(eq(places.id, id)).run();
   }
 }
 

@@ -789,39 +789,53 @@ function ListsSidebar({
                   >
                     {list.name}
                   </span>
+                  {/* Actions: ChevronRight always visible; lock/edit/delete collapse width when not hovered */}
                   <ChevronRight size={13} className="flex-shrink-0 text-muted-foreground opacity-40" />
-                  {/* Lock toggle button */}
-                  <button
-                    data-testid={`button-lock-list-${list.id}`}
-                    onClick={e => { e.stopPropagation(); onLockToggle(list.id, (list as any).locked ?? 0); }}
-                    className="w-8 h-8 rounded-md flex items-center justify-center transition-colors opacity-100 md:opacity-0 md:group-hover:opacity-100 flex-shrink-0"
-                    style={listLocked ? { color: "#f59e0b", background: "#f59e0b18" } : { color: "hsl(var(--muted-foreground))" }}
-                    aria-label={listLocked ? "Unlock list" : "Lock list"}
-                    title={listLocked ? "Unlock list" : "Lock entire list"}
-                  >
-                    {listLocked ? <Lock size={12} /> : <LockOpen size={12} />}
-                  </button>
-                  {/* Edit / delete buttons */}
-                  <button
-                    data-testid={`button-edit-list-${list.id}`}
-                    onClick={e => { e.stopPropagation(); onEdit(list.id); }}
-                    className="w-8 h-8 rounded-md flex items-center justify-center text-muted-foreground
-                      hover:bg-secondary hover:text-foreground active:bg-secondary/60 transition-colors
-                      opacity-100 md:opacity-0 md:group-hover:opacity-100 flex-shrink-0"
-                    aria-label="Rename list"
-                  >
-                    <Pencil size={12} />
-                  </button>
-                  <button
-                    data-testid={`button-delete-list-${list.id}`}
-                    onClick={e => { e.stopPropagation(); onDelete(list.id); }}
-                    className="w-8 h-8 rounded-md flex items-center justify-center text-muted-foreground
-                      hover:bg-destructive/15 hover:text-destructive active:bg-destructive/20 transition-colors
-                      opacity-100 md:opacity-0 md:group-hover:opacity-100 flex-shrink-0"
-                    aria-label="Delete list"
-                  >
-                    <Trash2 size={13} />
-                  </button>
+                  <div className="flex items-center gap-0.5 overflow-hidden max-w-0 md:group-hover:max-w-[7rem] transition-all duration-200 flex-shrink-0">
+                    {/* Lock toggle */}
+                    <button
+                      data-testid={`button-lock-list-${list.id}`}
+                      onClick={e => { e.stopPropagation(); onLockToggle(list.id, (list as any).locked ?? 0); }}
+                      className="w-8 h-8 rounded-md flex items-center justify-center transition-colors flex-shrink-0"
+                      style={listLocked ? { color: "#f59e0b", background: "#f59e0b18" } : { color: "hsl(var(--muted-foreground))" }}
+                      aria-label={listLocked ? "Unlock list" : "Lock list"}
+                      title={listLocked ? "Unlock list" : "Lock entire list"}
+                    >
+                      {listLocked ? <Lock size={12} /> : <LockOpen size={12} />}
+                    </button>
+                    {/* Edit */}
+                    <button
+                      data-testid={`button-edit-list-${list.id}`}
+                      onClick={e => { e.stopPropagation(); onEdit(list.id); }}
+                      className="w-8 h-8 rounded-md flex items-center justify-center text-muted-foreground
+                        hover:bg-secondary hover:text-foreground active:bg-secondary/60 transition-colors flex-shrink-0"
+                      aria-label="Rename list"
+                    >
+                      <Pencil size={12} />
+                    </button>
+                    {/* Delete */}
+                    <button
+                      data-testid={`button-delete-list-${list.id}`}
+                      onClick={e => { e.stopPropagation(); onDelete(list.id); }}
+                      className="w-8 h-8 rounded-md flex items-center justify-center text-muted-foreground
+                        hover:bg-destructive/15 hover:text-destructive active:bg-destructive/20 transition-colors flex-shrink-0"
+                      aria-label="Delete list"
+                    >
+                      <Trash2 size={13} />
+                    </button>
+                  </div>
+                  {/* On mobile: always show lock only (touch targets) */}
+                  <div className="md:hidden flex items-center gap-0.5 flex-shrink-0">
+                    <button
+                      data-testid={`button-lock-list-${list.id}-mobile`}
+                      onClick={e => { e.stopPropagation(); onLockToggle(list.id, (list as any).locked ?? 0); }}
+                      className="w-7 h-7 rounded-md flex items-center justify-center transition-colors flex-shrink-0"
+                      style={listLocked ? { color: "#f59e0b", background: "#f59e0b18" } : { color: "hsl(var(--muted-foreground))" }}
+                      aria-label={listLocked ? "Unlock list" : "Lock list"}
+                    >
+                      {listLocked ? <Lock size={11} /> : <LockOpen size={11} />}
+                    </button>
+                  </div>
                 </>
               )}
             </div>
