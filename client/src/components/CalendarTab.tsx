@@ -14,7 +14,7 @@ import {
   ChevronLeft, ChevronRight, Plus, X, Pencil, Trash2,
   CalendarDays, Clock, MapPin, AlignLeft, Star,
 } from "lucide-react";
-import type { Event } from "@shared/schema";
+import type { Event, TodoItem } from "@shared/schema";
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -372,7 +372,26 @@ export default function CalendarTab() {
     staleTime: 30_000,
   });
 
+  // Fetch all todo items that have due dates (across all lists)
+  const { data: todoDueItems = [] } = useQuery<any[]>({
+    queryKey: ["/api/todo-due-dates"],
+    queryFn: () => apiRequest("GET", "/api/todo-due-dates"),
+    staleTime: 30_000,
+  });
+
+  // Map: ISO due_date → todo items[]
+  const todoByDate = useMemo(() => {
+    const map: Record<string, { id: number; title: string; checked: boolean; list_name: string; priority: string }[]> = {};
+    for (const item of todoDueItems) {
+      if (item.due_date) {
+        (map[item.due_date] = map[item.due_date] ?? []).push(item);
+      }
+    }
+    return map;
+  }, [todoDueItems]);
+
   // Map: ISO date → events[]
+
   const eventsByDate = useMemo(() => {
     const map: Record<string, Event[]> = {};
     allEvents.forEach(e => {
@@ -434,6 +453,7 @@ export default function CalendarTab() {
   });
 
   const selectedEvents = selectedDay ? (eventsByDate[selectedDay] ?? []) : [];
+  const selectedTodos  = selectedDay ? (todoByDate[selectedDay] ?? []) : [];
   const todayCellISO = `${year}-${String(month + 1).padStart(2,"0")}-${String(new Date().getDate()).padStart(2,"0")}`;
 
   return (
@@ -484,6 +504,7 @@ export default function CalendarTab() {
             }
             const iso = `${year}-${String(month + 1).padStart(2,"0")}-${String(day).padStart(2,"0")}`;
             const dayEvts = eventsByDate[iso] ?? [];
+            const dayTodos = todoByDate[iso] ?? [];
             const isToday    = iso === today;
             const isSelected = iso === selectedDay;
             const isWeekend  = [5, 6].includes(i % 7); // Sat/Sun
@@ -508,6 +529,13 @@ export default function CalendarTab() {
                   {day}
                 </span>
                 {dayEvts.length > 0 && <EventDots evts={dayEvts} />}
+                {dayTodos.length > 0 && (
+                  <div className="flex gap-0.5 mt-0.5 flex-wrap justify-center">
+                    {dayTodos.slice(0, 3).map((t, i) => (
+                      <span key={i} className={`w-1.5 h-1.5 rounded-full ${t.checked ? "bg-green-500/60" : t.priority === "high" ? "bg-red-400/80" : "bg-violet-400/80"}`} />
+                    ))}
+                  </div>
+                )}
               </button>
             );
           })}
@@ -533,9 +561,10 @@ export default function CalendarTab() {
             </div>
           </div>
           <div className="p-4 space-y-2">
-            {selectedEvents.length === 0 ? (
+            {selectedEvents.length === 0 && selectedTodos.length === 0 ? (
               <p className="text-sm text-muted-foreground text-center py-4">No events — click Add to plan something</p>
-            ) : selectedEvents.map(e => (
+            ) : null}
+            {selectedEvents.map(e => (
               <EventChip
                 key={e.id}
                 event={e}
@@ -543,6 +572,20 @@ export default function CalendarTab() {
                 onDelete={handleDelete}
               />
             ))}
+            {selectedTodos.length > 0 && (
+              <div className="space-y-1.5">
+                {selectedTodos.length > 0 && selectedEvents.length > 0 && (
+                  <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mt-2 mb-1">Todo due dates</p>
+                )}
+                {selectedTodos.map(todo => (
+                  <div key={todo.id} className={`flex items-center gap-2 px-3 py-2 rounded-xl border text-sm transition-colors ${todo.checked ? "opacity-50 border-white/5 bg-white/3" : "border-violet-500/20 bg-violet-500/5"}`}>
+                    <span className={`w-2 h-2 rounded-full shrink-0 ${todo.checked ? "bg-green-500/60" : todo.priority === "high" ? "bg-red-400" : "bg-violet-400"}`} />
+                    <span className={`flex-1 truncate ${todo.checked ? "line-through text-slate-500" : "text-slate-200"}`}>{todo.title}</span>
+                    <span className="text-xs text-slate-500 truncate">{todo.list_name}</span>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
       )}

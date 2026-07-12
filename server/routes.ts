@@ -1,6 +1,7 @@
 import type { Express } from "express";
 import { Server } from "http";
 import { storage } from "./storage";
+import { insertTodoListSchema, insertTodoItemSchema } from "@shared/schema";
 import fetch from "node-fetch";
 
 const USER_ID = 1;
@@ -840,4 +841,65 @@ export async function registerRoutes(httpServer: Server, app: Express) {
     storage.deletePlace(Number(req.params.id));
     res.json({ ok: true });
   });
+
+  // ── Todos ─────────────────────────────────────────────────────────────────────
+  // Return all todo items that have a due_date (for calendar display)
+  app.get("/api/todo-due-dates", (req, res) => {
+    const lists = storage.getTodoLists(true); // include archived
+    const result: any[] = [];
+    for (const list of lists) {
+      const items = storage.getTodoItems(list.id);
+      for (const item of items) {
+        if (item.due_date) {
+          result.push({ ...item, list_name: list.name });
+        }
+      }
+    }
+    res.json(result);
+  });
+
+  app.get("/api/todo-lists", (req, res) => {
+    const includeArchived = req.query.archived === "true";
+    res.json(storage.getTodoLists(includeArchived));
+  });
+  app.post("/api/todo-lists", (req, res) => {
+    try {
+      const data = insertTodoListSchema.parse(req.body);
+      res.json(storage.createTodoList(data));
+    } catch (e: any) { res.status(400).json({ error: e.message }); }
+  });
+  app.patch("/api/todo-lists/:id", (req, res) => {
+    const updated = storage.updateTodoList(Number(req.params.id), req.body);
+    if (!updated) return res.status(404).json({ error: "not found" });
+    res.json(updated);
+  });
+  app.delete("/api/todo-lists/:id", (req, res) => {
+    storage.deleteTodoList(Number(req.params.id));
+    res.json({ ok: true });
+  });
+  app.post("/api/todo-lists/:id/clone", (req, res) => {
+    try {
+      const { name, created_by } = req.body;
+      res.json(storage.cloneTodoFromTemplate(Number(req.params.id), name, created_by || "together"));
+    } catch (e: any) { res.status(400).json({ error: e.message }); }
+  });
+  app.get("/api/todo-lists/:id/items", (req, res) => {
+    res.json(storage.getTodoItems(Number(req.params.id)));
+  });
+  app.post("/api/todo-lists/:id/items", (req, res) => {
+    try {
+      const data = insertTodoItemSchema.parse({ ...req.body, list_id: Number(req.params.id) });
+      res.json(storage.createTodoItem(data));
+    } catch (e: any) { res.status(400).json({ error: e.message }); }
+  });
+  app.patch("/api/todo-items/:id", (req, res) => {
+    const updated = storage.updateTodoItem(Number(req.params.id), req.body);
+    if (!updated) return res.status(404).json({ error: "not found" });
+    res.json(updated);
+  });
+  app.delete("/api/todo-items/:id", (req, res) => {
+    storage.deleteTodoItem(Number(req.params.id));
+    res.json({ ok: true });
+  });
+
 }

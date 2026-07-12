@@ -1,7 +1,7 @@
 import { eq, and, desc, sql } from "drizzle-orm";
 import {
   users, items, collections, collectionItems, profiles, links, linkLists, secretMessages, quotes, restaurants, dailyMoods,
-  groceryLists, groceryItems, events, places,
+  groceryLists, groceryItems, events, places, todoLists, todoItems,
   type User, type InsertUser,
   type Item, type InsertItem,
   type Collection, type InsertCollection,
@@ -14,6 +14,7 @@ import {
   type Restaurant, type InsertRestaurant,
   type DailyMood, type InsertDailyMood,
   type GroceryList, type GroceryItem, type InsertGroceryList, type InsertGroceryItem,
+  type TodoList, type TodoItem, type InsertTodoList, type InsertTodoItem,
   type Event, type InsertEvent,
   type Place, type InsertPlace,
   type ItemWithStatus,
@@ -244,6 +245,30 @@ try { sqlite.exec(`CREATE TABLE IF NOT EXISTS events (
   created_by TEXT NOT NULL,
   created_at TEXT NOT NULL DEFAULT ''
 )`); } catch {}
+try { sqlite.exec(`CREATE TABLE IF NOT EXISTS todo_lists (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  name TEXT NOT NULL,
+  description TEXT,
+  is_template INTEGER NOT NULL DEFAULT 0,
+  is_archived INTEGER NOT NULL DEFAULT 0,
+  created_by TEXT NOT NULL,
+  created_at TEXT NOT NULL DEFAULT ''
+)`); } catch {}
+
+try { sqlite.exec(`CREATE TABLE IF NOT EXISTS todo_items (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  list_id INTEGER NOT NULL,
+  parent_id INTEGER,
+  title TEXT NOT NULL,
+  notes TEXT,
+  category TEXT,
+  priority TEXT NOT NULL DEFAULT 'medium',
+  due_date TEXT,
+  checked INTEGER NOT NULL DEFAULT 0,
+  sort_order INTEGER NOT NULL DEFAULT 0
+)`); } catch {}
+
+
 try { sqlite.exec(`CREATE TABLE IF NOT EXISTS grocery_items (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   list_id INTEGER NOT NULL,
@@ -533,6 +558,18 @@ export interface IStorage {
   createPlace(data: InsertPlace): Place;
   updatePlace(id: number, data: Partial<InsertPlace>): Place | undefined;
   deletePlace(id: number): void;
+
+  // Todo
+  getTodoLists(includeArchived?: boolean): TodoList[];
+  getTodoList(id: number): TodoList | undefined;
+  createTodoList(data: Omit<InsertTodoList, 'created_at'>): TodoList;
+  updateTodoList(id: number, data: Partial<InsertTodoList>): TodoList | undefined;
+  deleteTodoList(id: number): void;
+  getTodoItems(listId: number): TodoItem[];
+  createTodoItem(data: InsertTodoItem): TodoItem;
+  updateTodoItem(id: number, data: Partial<InsertTodoItem>): TodoItem | undefined;
+  deleteTodoItem(id: number): void;
+  cloneTodoFromTemplate(templateId: number, name: string, createdBy: string): TodoList;
 }
 
 export class Storage implements IStorage {
@@ -916,6 +953,62 @@ export class Storage implements IStorage {
   deletePlace(id: number) {
     db.delete(places).where(eq(places.id, id)).run();
   }
+  // ── Todo ─────────────────────────────────────────────────────────────────────
+  getTodoLists(includeArchived = false) {
+    const all = db.select().from(todoLists).orderBy(desc(todoLists.id)).all();
+    return includeArchived ? all : all.filter(l => !l.is_archived);
+  }
+  getTodoList(id: number) {
+    return db.select().from(todoLists).where(eq(todoLists.id, id)).get();
+  }
+  createTodoList(data: Omit<InsertTodoList, 'created_at'>) {
+    return db.insert(todoLists).values({ ...data, created_at: new Date().toISOString() }).returning().get()!;
+  }
+  updateTodoList(id: number, data: Partial<InsertTodoList>) {
+    return db.update(todoLists).set(data).where(eq(todoLists.id, id)).returning().get();
+  }
+  deleteTodoList(id: number) {
+    db.delete(todoItems).where(eq(todoItems.list_id, id)).run();
+    db.delete(todoLists).where(eq(todoLists.id, id)).run();
+  }
+  getTodoItems(listId: number) {
+    return db.select().from(todoItems)
+      .where(eq(todoItems.list_id, listId))
+      .orderBy(todoItems.sort_order)
+      .all();
+  }
+  createTodoItem(data: InsertTodoItem) {
+    return db.insert(todoItems).values(data).returning().get()!;
+  }
+  updateTodoItem(id: number, data: Partial<InsertTodoItem>) {
+    return db.update(todoItems).set(data).where(eq(todoItems.id, id)).returning().get();
+  }
+  deleteTodoItem(id: number) {
+    // also delete subtasks
+    const item = db.select().from(todoItems).where(eq(todoItems.id, id)).get();
+    if (item && !item.parent_id) {
+      db.delete(todoItems).where(eq(todoItems.parent_id, id)).run();
+    }
+    db.delete(todoItems).where(eq(todoItems.id, id)).run();
+  }
+  cloneTodoFromTemplate(templateId: number, name: string, createdBy: string) {
+    const tmpl = this.getTodoList(templateId);
+    if (!tmpl) throw new Error("Template not found");
+    const newList = this.createTodoList({ name, description: tmpl.description, is_template: 0, is_archived: 0, created_by: createdBy });
+    const items = this.getTodoItems(templateId);
+    const idMap: Record<number, number> = {};
+    // first pass: top-level
+    for (const item of items.filter(i => !i.parent_id)) {
+      const newItem = this.createTodoItem({ list_id: newList.id, parent_id: null, title: item.title, notes: item.notes, category: item.category, priority: item.priority, due_date: item.due_date, checked: 0, sort_order: item.sort_order });
+      idMap[item.id] = newItem.id;
+    }
+    // second pass: subtasks
+    for (const item of items.filter(i => i.parent_id)) {
+      this.createTodoItem({ list_id: newList.id, parent_id: idMap[item.parent_id!] ?? null, title: item.title, notes: item.notes, category: item.category, priority: item.priority, due_date: item.due_date, checked: 0, sort_order: item.sort_order });
+    }
+    return newList;
+  }
+
 }
 
 export const storage = new Storage();

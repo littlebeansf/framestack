@@ -5,6 +5,7 @@ import OwnerCollectionsPage from "./owner-collections";
 import OwnerIntro from "@/components/OwnerIntro";
 import LinkList from "@/components/LinkList";
 import GroceryTab from "@/components/GroceryTab";
+import TodoTab from "@/components/TodoTab";
 import CalendarTab from "@/components/CalendarTab";
 import PlacesTab from "@/components/PlacesTab";
 import { navHistory } from "@/lib/navHistory";
@@ -30,7 +31,7 @@ const ACCENT = "hsl(20 90% 60%)";
 
 type TopTab = "space" | "catalogs" | "activities";
 type CatalogSub = "watchlists" | "links" | "places";
-type ActivitySub = "calendar" | "grocery";
+type ActivitySub = "calendar" | "grocery" | "todos";
 
 // Derive active tabs from `sub` string passed from App.tsx
 function parseSub(sub?: string): { top: TopTab; cat: CatalogSub; act: ActivitySub } {
@@ -41,6 +42,7 @@ function parseSub(sub?: string): { top: TopTab; cat: CatalogSub; act: ActivitySu
   if (sub === "activities")       return { top: "activities", cat: "watchlists", act: "calendar" };
   if (sub === "grocery")          return { top: "activities", cat: "watchlists", act: "grocery" };
   if (sub === "calendar")         return { top: "activities", cat: "watchlists", act: "calendar" };
+  if (sub === "todos")            return { top: "activities", cat: "watchlists", act: "todos" };
   // Legacy: keep old /together/collections working
   if (sub === "collections")      return { top: "catalogs", cat: "watchlists", act: "calendar" };
   if (sub === "restaurants")      return { top: "catalogs", cat: "places", act: "calendar" };
@@ -65,6 +67,7 @@ function catPath(cat: CatalogSub): string {
 function actPath(act: ActivitySub): string {
   if (act === "calendar") return "/together/activities";
   if (act === "grocery")  return "/together/grocery";
+  if (act === "todos")    return "/together/todos";
   return "/together/activities";
 }
 
@@ -130,6 +133,7 @@ export default function TogetherPage({ sub }: { sub?: string }) {
   const ACTIVITY_TABS: { id: ActivitySub; label: string }[] = [
     { id: "calendar", label: "📅 Calendar" },
     { id: "grocery",  label: "🛒 Grocery" },
+    { id: "todos",    label: "✅ Todos" },
   ];
 
   function handleTopSelect(id: TopTab) {
@@ -173,6 +177,7 @@ export default function TogetherPage({ sub }: { sub?: string }) {
         {top === "catalogs"   && cat === "places"     && <PlacesTab />}
         {top === "activities" && act === "calendar"   && <CalendarTab />}
         {top === "activities" && act === "grocery"    && <GroceryTab />}
+        {top === "activities" && act === "todos"     && <TodoTab currentUser={activeUser} />}
       </div>
     </div>
   );

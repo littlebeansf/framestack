@@ -427,3 +427,36 @@ export type GroceryList = typeof groceryLists.$inferSelect;
 export type GroceryItem = typeof groceryItems.$inferSelect;
 export type InsertGroceryList = typeof groceryLists.$inferInsert;
 export type InsertGroceryItem = typeof groceryItems.$inferInsert;
+
+// ── Todo Lists ────────────────────────────────────────────────────────────────
+
+export const todoLists = sqliteTable("todo_lists", {
+  id:           integer("id").primaryKey({ autoIncrement: true }),
+  name:         text("name").notNull(),
+  description:  text("description"),
+  is_template:  integer("is_template").notNull().default(0),
+  is_archived:  integer("is_archived").notNull().default(0),
+  created_by:   text("created_by").notNull(), // "jack"|"sally"|"together"
+  created_at:   text("created_at").notNull().default(""),
+});
+
+export const todoItems = sqliteTable("todo_items", {
+  id:          integer("id").primaryKey({ autoIncrement: true }),
+  list_id:     integer("list_id").notNull(),
+  parent_id:   integer("parent_id"),           // null = top-level task, set = subtask
+  title:       text("title").notNull(),
+  notes:       text("notes"),
+  category:    text("category"),               // e.g. "Adressen", "Umzug" etc.
+  priority:    text("priority").notNull().default("medium"), // "high"|"medium"|"low"
+  due_date:    text("due_date"),               // YYYY-MM-DD optional
+  checked:     integer("checked").notNull().default(0),
+  sort_order:  integer("sort_order").notNull().default(0),
+});
+
+export const insertTodoListSchema = createInsertSchema(todoLists).omit({ id: true, created_at: true });
+export const insertTodoItemSchema = createInsertSchema(todoItems).omit({ id: true });
+
+export type TodoList   = typeof todoLists.$inferSelect;
+export type TodoItem   = typeof todoItems.$inferSelect;
+export type InsertTodoList = typeof todoLists.$inferInsert;
+export type InsertTodoItem = typeof todoItems.$inferInsert;

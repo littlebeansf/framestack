@@ -251,6 +251,7 @@ export default function App() {
             <Route path="/together/activities">{() => <TogetherPage sub="activities" />}</Route>
             <Route path="/together/calendar">{() => <TogetherPage sub="calendar" />}</Route>
             <Route path="/together/grocery">{() => <TogetherPage sub="grocery" />}</Route>
+            <Route path="/together/todos">{() => <TogetherPage sub="todos" />}</Route>
             {/* Legacy redirects (keep working) */}
             <Route path="/together/collections">{() => <TogetherPage sub="collections" />}</Route>
             <Route path="/together/restaurants">{() => <TogetherPage sub="restaurants" />}</Route>

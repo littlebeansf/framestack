@@ -74,10 +74,10 @@ export default function SearchDialog({
   }, [open]);
 
   useEffect(() => {
-    if (!query.trim()) { setResults([]); return; }
+    if (!query.trim()) { setResults([]); setLoading(false); return; }
+    setLoading(true); // show spinner immediately on keystroke
     clearTimeout(debounceRef.current);
     debounceRef.current = setTimeout(async () => {
-      setLoading(true);
       try {
         const data = await searchAll(query, filterType);
         setResults(data);
