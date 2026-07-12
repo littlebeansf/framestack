@@ -451,7 +451,7 @@ export default function TodoTab({ currentUser }: TodoTabProps) {
 
   const templates = allLists.filter(l => l.is_template);
   const activeLists = allLists.filter(l => !l.is_template);
-  const selectedList = activeLists.find(l => l.id === selectedListId) ?? activeLists[0] ?? null;
+  const selectedList = allLists.find(l => l.id === selectedListId) ?? activeLists[0] ?? null;
 
   // Fetch items for selected list
   const { data: allItems = [] } = useQuery<TodoItem[]>({
@@ -549,21 +549,14 @@ export default function TodoTab({ currentUser }: TodoTabProps) {
       const listResp = await apiRequest("POST", "/api/todo-lists", {
         name: "Umzugsplanung",
         description: "Moving checklist — created by Sally",
-        is_template: 1,
+        is_template: 0,
         is_archived: 0,
         created_by: "sally",
       });
       const list: TodoList = await listResp.json();
       qc.setQueryData(["/api/todo-lists", showArchived], (old: TodoList[] = []) => [list, ...old]);
 
-      // Insert top-level items first, track ID map for subtasks
-      const idMap: Record<number, number> = {};
-      // Items with parent_id < 0 are subtasks referencing top-level by negative index
-      // Encode: parent_id -1 = most recent task index 0, -2 = second most recent, etc.
-      const topItems = SEED_ITEMS.filter(i => !i.parent_id || i.parent_id === null);
-      const subItems = SEED_ITEMS.filter(i => i.parent_id !== null && (i.parent_id as number) < 0);
-
-      // Actually, we use negative parent_id as relative back-refs; process in order
+      // Process items in order; negative parent_id = back-ref to Nth most recent top-level
       let lastTopIds: number[] = [];
       for (const seed of SEED_ITEMS) {
         const parentId = seed.parent_id as number | null;
@@ -572,7 +565,8 @@ export default function TodoTab({ currentUser }: TodoTabProps) {
           const createdResp = await apiRequest("POST", `/api/todo-lists/${list.id}/items`, {
             ...seed, parent_id: null, list_id: list.id,
           });
-          lastTopIds.push(created.id);
+          const createdItem: TodoItem = await createdResp.json();
+          lastTopIds.push(createdItem.id);
         } else if (parentId < 0) {
           // subtask: parent_id -1 = last top, -2 = second to last, etc.
           const parentRealId = lastTopIds[lastTopIds.length + parentId];
@@ -583,8 +577,6 @@ export default function TodoTab({ currentUser }: TodoTabProps) {
           }
         }
       }
-      // Refresh
-      qc.setQueryData(["/api/todo-lists", showArchived], (old: TodoList[] = []) => old); // trigger re-fetch
       setSelectedListId(list.id);
     } finally {
       setIsSeedingList(false);
