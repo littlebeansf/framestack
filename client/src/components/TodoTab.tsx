@@ -353,12 +353,12 @@ function NewListDialog({ templates, createdBy, onClose, onCreated }: NewListDial
   const qc = useQueryClient();
 
   const createMutation = useMutation({
-    mutationFn: (data: any) => apiRequest("POST", "/api/todo-lists", data),
-    onSuccess: (list: TodoList) => { qc.setQueryData(["/api/todo-lists"], (old: TodoList[] = []) => [list, ...old]); onCreated(list); onClose(); },
+    mutationFn: async (data: any) => { const r = await apiRequest("POST", "/api/todo-lists", data); return r.json(); },
+    onSuccess: (list: TodoList) => { qc.setQueryData(["/api/todo-lists", false], (old: TodoList[] = []) => [list, ...old]); onCreated(list); onClose(); },
   });
   const cloneMutation = useMutation({
-    mutationFn: ({ id, ...data }: any) => apiRequest("POST", `/api/todo-lists/${id}/clone`, data),
-    onSuccess: (list: TodoList) => { qc.setQueryData(["/api/todo-lists"], (old: TodoList[] = []) => [list, ...old]); onCreated(list); onClose(); },
+    mutationFn: async ({ id, ...data }: any) => { const r = await apiRequest("POST", `/api/todo-lists/${id}/clone`, data); return r.json(); },
+    onSuccess: (list: TodoList) => { qc.setQueryData(["/api/todo-lists", false], (old: TodoList[] = []) => [list, ...old]); onCreated(list); onClose(); },
   });
 
   function handleCreate() {
@@ -445,7 +445,7 @@ export default function TodoTab({ currentUser }: TodoTabProps) {
   // Fetch all lists
   const { data: allLists = [] } = useQuery<TodoList[]>({
     queryKey: ["/api/todo-lists", showArchived],
-    queryFn: () => apiRequest("GET", `/api/todo-lists?archived=${showArchived}`),
+    queryFn: async () => { const r = await apiRequest("GET", `/api/todo-lists?archived=${showArchived}`); return r.json(); },
     staleTime: 5000,
   });
 
@@ -456,7 +456,7 @@ export default function TodoTab({ currentUser }: TodoTabProps) {
   // Fetch items for selected list
   const { data: allItems = [] } = useQuery<TodoItem[]>({
     queryKey: ["/api/todo-lists", selectedList?.id, "items"],
-    queryFn: () => apiRequest("GET", `/api/todo-lists/${selectedList!.id}/items`),
+    queryFn: async () => { const r = await apiRequest("GET", `/api/todo-lists/${selectedList!.id}/items`); return r.json(); },
     enabled: !!selectedList,
     staleTime: 3000,
   });
@@ -492,14 +492,14 @@ export default function TodoTab({ currentUser }: TodoTabProps) {
 
   // Mutations
   const createItem = useMutation({
-    mutationFn: (data: any) => apiRequest("POST", `/api/todo-lists/${selectedList!.id}/items`, data),
+    mutationFn: async (data: any) => { const r = await apiRequest("POST", `/api/todo-lists/${selectedList!.id}/items`, data); return r.json(); },
     onSuccess: (item: TodoItem) => {
       qc.setQueryData(["/api/todo-lists", selectedList!.id, "items"], (old: TodoItem[] = []) => [...old, item]);
     },
   });
 
   const updateItem = useMutation({
-    mutationFn: ({ id, ...data }: any) => apiRequest("PATCH", `/api/todo-items/${id}`, data),
+    mutationFn: async ({ id, ...data }: any) => { const r = await apiRequest("PATCH", `/api/todo-items/${id}`, data); return r.json(); },
     onSuccess: (item: TodoItem) => {
       qc.setQueryData(["/api/todo-lists", selectedList!.id, "items"], (old: TodoItem[] = []) =>
         old.map(i => i.id === item.id ? item : i)
@@ -508,7 +508,7 @@ export default function TodoTab({ currentUser }: TodoTabProps) {
   });
 
   const deleteItem = useMutation({
-    mutationFn: (id: number) => apiRequest("DELETE", `/api/todo-items/${id}`),
+    mutationFn: async (id: number) => { await apiRequest("DELETE", `/api/todo-items/${id}`); return id; },
     onSuccess: (_: any, id: number) => {
       qc.setQueryData(["/api/todo-lists", selectedList!.id, "items"], (old: TodoItem[] = []) =>
         old.filter(i => i.id !== id && i.parent_id !== id)
@@ -517,7 +517,7 @@ export default function TodoTab({ currentUser }: TodoTabProps) {
   });
 
   const updateList = useMutation({
-    mutationFn: ({ id, ...data }: any) => apiRequest("PATCH", `/api/todo-lists/${id}`, data),
+    mutationFn: async ({ id, ...data }: any) => { const r = await apiRequest("PATCH", `/api/todo-lists/${id}`, data); return r.json(); },
     onSuccess: (list: TodoList) => {
       qc.setQueryData(["/api/todo-lists", showArchived], (old: TodoList[] = []) =>
         old.map(l => l.id === list.id ? list : l)
@@ -526,7 +526,7 @@ export default function TodoTab({ currentUser }: TodoTabProps) {
   });
 
   const deleteList = useMutation({
-    mutationFn: (id: number) => apiRequest("DELETE", `/api/todo-lists/${id}`),
+    mutationFn: async (id: number) => { await apiRequest("DELETE", `/api/todo-lists/${id}`); return id; },
     onSuccess: (_: any, id: number) => {
       qc.setQueryData(["/api/todo-lists", showArchived], (old: TodoList[] = []) => old.filter(l => l.id !== id));
       if (selectedListId === id) setSelectedListId(null);
@@ -535,7 +535,7 @@ export default function TodoTab({ currentUser }: TodoTabProps) {
 
   const cloneList = useMutation({
     mutationFn: ({ id, name }: { id: number; name: string }) =>
-      apiRequest("POST", `/api/todo-lists/${id}/clone`, { name, created_by: currentUser }),
+      apiRequest("POST", `/api/todo-lists/${id}/clone`, { name, created_by: currentUser }).then(r => r.json()),
     onSuccess: (list: TodoList) => {
       qc.setQueryData(["/api/todo-lists", showArchived], (old: TodoList[] = []) => [list, ...old]);
       setSelectedListId(list.id);
@@ -546,13 +546,14 @@ export default function TodoTab({ currentUser }: TodoTabProps) {
   async function seedUmzugsplanung() {
     setIsSeedingList(true);
     try {
-      const list: TodoList = await apiRequest("POST", "/api/todo-lists", {
+      const listResp = await apiRequest("POST", "/api/todo-lists", {
         name: "Umzugsplanung",
         description: "Moving checklist — created by Sally",
         is_template: 1,
         is_archived: 0,
         created_by: "sally",
       });
+      const list: TodoList = await listResp.json();
       qc.setQueryData(["/api/todo-lists", showArchived], (old: TodoList[] = []) => [list, ...old]);
 
       // Insert top-level items first, track ID map for subtasks
@@ -568,7 +569,7 @@ export default function TodoTab({ currentUser }: TodoTabProps) {
         const parentId = seed.parent_id as number | null;
         if (parentId === null || parentId === undefined) {
           // top-level
-          const created: TodoItem = await apiRequest("POST", `/api/todo-lists/${list.id}/items`, {
+          const createdResp = await apiRequest("POST", `/api/todo-lists/${list.id}/items`, {
             ...seed, parent_id: null, list_id: list.id,
           });
           lastTopIds.push(created.id);

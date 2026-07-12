@@ -375,7 +375,7 @@ export default function CalendarTab() {
   // Fetch all todo items that have due dates (across all lists)
   const { data: todoDueItems = [] } = useQuery<any[]>({
     queryKey: ["/api/todo-due-dates"],
-    queryFn: () => apiRequest("GET", "/api/todo-due-dates"),
+    queryFn: async () => { const r = await apiRequest("GET", "/api/todo-due-dates"); return r.json(); },
     staleTime: 30_000,
   });
 
