@@ -177,7 +177,7 @@ export default function TogetherPage({ sub }: { sub?: string }) {
         {top === "catalogs"   && cat === "places"     && <PlacesTab />}
         {top === "activities" && act === "calendar"   && <CalendarTab />}
         {top === "activities" && act === "grocery"    && <GroceryTab />}
-        {top === "activities" && act === "todos"     && <TodoTab currentUser={activeUser} />}
+        {top === "activities" && act === "todos"     && <TodoTab currentUser="together" />}
       </div>
     </div>
   );
