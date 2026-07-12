@@ -602,9 +602,9 @@ export default function TodoTab({ currentUser }: TodoTabProps) {
   // ─── Render ─────────────────────────────────────────────────────────────────
 
   return (
-    <div className="flex h-full min-h-0 overflow-hidden">
+    <div className="flex flex-col md:flex-row min-h-[500px] md:h-full md:min-h-0 overflow-visible md:overflow-hidden">
       {/* Sidebar */}
-      <div className="w-56 shrink-0 border-r border-white/8 flex flex-col bg-[#0e0f18]/60">
+      <div className="w-full md:w-56 shrink-0 md:border-r border-b md:border-b-0 border-white/8 flex flex-col bg-[#0e0f18]/60 max-h-48 md:max-h-none overflow-y-auto">
         <div className="p-3 flex items-center justify-between">
           <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Todo Lists</span>
           <button

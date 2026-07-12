@@ -1602,7 +1602,7 @@ export type CompanionPlacement = "float" | "sidebar" | "mobile";
 export default function FloatingCompanions({ placement = "float" }: { placement?: CompanionPlacement }) {
   const [jackSpeech, setJackSpeech] = useState("");
   const [sallySpeech, setSallySpeech] = useState("");
-  const [collapsed, setCollapsed] = useState(false);
+  const [collapsed, setCollapsed] = useState(() => typeof window !== 'undefined' && window.innerWidth < 768);
   const [corner, setCorner] = useState<Corner>("bottom-right");
   const [showSettings, setShowSettings] = useState(false);
 
