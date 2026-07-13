@@ -37,6 +37,7 @@ import {
   ChevronRight,
   Lock,
   LockOpen,
+  FolderSymlink,
 } from "lucide-react";
 
 const ACCENT = "hsl(20 90% 60%)";
@@ -116,10 +117,12 @@ function SortToggle({ sort, onToggle }: { sort: SortDir; onToggle: () => void })
 
 // ── Link row ──────────────────────────────────────────────────────────────────
 
-function LinkRow({ link, onDelete, onUpdate }: {
+function LinkRow({ link, onDelete, onUpdate, onMove, allLists }: {
   link: Link;
   onDelete: (id: number) => void;
   onUpdate: (id: number, data: Partial<{ title: string; url: string; icon: string | null; locked: number }>) => void;
+  onMove?: (id: number, targetListId: number) => void;
+  allLists?: import("@shared/schema").LinkList[];
 }) {
   const { toast } = useToast();
   const [faviconError, setFaviconError] = useState(false);
@@ -127,8 +130,22 @@ function LinkRow({ link, onDelete, onUpdate }: {
   const [editTitle, setEditTitle] = useState(link.title);
   const [editUrl, setEditUrl] = useState(link.url);
   const [editIcon, setEditIcon] = useState(link.icon ?? "");
+  const [moveOpen, setMoveOpen] = useState(false);
+  const moveRef = useRef<HTMLDivElement>(null);
   const href = ensureHttps(link.url);
   const locked = (link as any).locked === 1;
+  const otherLists = (allLists ?? []).filter(l => l.id !== link.listId && !(l as any).locked);
+
+  useEffect(() => {
+    if (!moveOpen) return;
+    function handleClick(e: MouseEvent) {
+      if (moveRef.current && !moveRef.current.contains(e.target as Node)) {
+        setMoveOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, [moveOpen]);
 
   function handleSaveEdit() {
     const t = editTitle.trim();
@@ -292,6 +309,44 @@ function LinkRow({ link, onDelete, onUpdate }: {
           >
             <ExternalLink size={15} />
           </a>
+        )}
+
+        {/* Move to list */}
+        {onMove && otherLists.length > 0 && (
+          <div className="relative" ref={moveRef}>
+            <button
+              data-testid={`button-link-move-${link.id}`}
+              onClick={() => setMoveOpen(o => !o)}
+              className="w-9 h-9 rounded-lg flex items-center justify-center text-muted-foreground
+                hover:bg-secondary hover:text-foreground active:bg-secondary transition-colors"
+              aria-label="Move to another list"
+              title="Move to…"
+            >
+              <FolderSymlink size={14} />
+            </button>
+            {moveOpen && (
+              <div
+                className="absolute right-0 bottom-10 z-50 min-w-[160px] rounded-xl border border-border bg-card shadow-2xl py-1 overflow-hidden"
+                onClick={e => e.stopPropagation()}
+              >
+                <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground px-3 pt-2 pb-1">
+                  Move to…
+                </p>
+                {otherLists.map(lst => (
+                  <button
+                    key={lst.id}
+                    data-testid={`button-link-move-to-${lst.id}`}
+                    onClick={() => { onMove(link.id, lst.id); setMoveOpen(false); }}
+                    className="w-full flex items-center gap-2 px-3 py-2 text-sm text-foreground
+                      hover:bg-secondary active:bg-secondary/80 transition-colors text-left"
+                  >
+                    <span className="text-base leading-none flex-shrink-0">{lst.emoji ?? "🔗"}</span>
+                    <span className="truncate">{lst.name}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
         )}
 
         {/* Delete */}
@@ -488,10 +543,12 @@ function LinksPanel({
   list,
   onBack,
   onUnlock,
+  allLists = [],
 }: {
   list: LinkListType;
   onBack?: () => void; // mobile only
   onUnlock: () => void;
+  allLists?: LinkListType[];
 }) {
   const listLocked = (list as any).locked === 1;
   if (listLocked) {
@@ -532,6 +589,28 @@ function LinksPanel({
 
   function handleUpdateLink(id: number, data: Partial<{ title: string; url: string; icon: string | null; locked: number }>) {
     updateMutation.mutate({ id, data });
+  }
+
+  const moveMutation = useMutation({
+    mutationFn: ({ id, targetListId }: { id: number; targetListId: number }) =>
+      apiRequest("PATCH", `/api/links/${id}`, { listId: targetListId }),
+    onSuccess: async (res, { id, targetListId }) => {
+      const moved: Link = await res.json();
+      // Remove from current list cache
+      qc.setQueryData(linksKey, (old: Link[] = []) => old.filter(l => l.id !== id));
+      // Append to target list cache if it exists
+      const targetKey = ["/api/link-lists", targetListId, "links"];
+      qc.setQueryData(targetKey, (old: Link[] | undefined) =>
+        old ? [moved, ...old] : undefined
+      );
+      const targetList = allLists.find(l => l.id === targetListId);
+      toast({ title: `Moved to ${targetList?.emoji ?? "🔗"} ${targetList?.name ?? "list"}` });
+    },
+    onError: () => toast({ title: "Failed to move link", variant: "destructive" }),
+  });
+
+  function handleMoveLink(id: number, targetListId: number) {
+    moveMutation.mutate({ id, targetListId });
   }
 
   const sorted = useMemo(() => {
@@ -597,6 +676,8 @@ function LinksPanel({
             link={link}
             onDelete={id => deleteMutation.mutate(id)}
             onUpdate={handleUpdateLink}
+            onMove={handleMoveLink}
+            allLists={allLists}
           />
         ))}
       </div>
@@ -977,7 +1058,7 @@ export default function LinkList() {
             onCreate={(name, emoji) => createMutation.mutate({ name, emoji: emoji || null, createdAt: Date.now() })}
           />
         ) : (
-          <LinksPanel list={selectedList} onBack={handleBack} onUnlock={() => handleUnlock(selectedList.id)} />
+          <LinksPanel list={selectedList} onBack={handleBack} onUnlock={() => handleUnlock(selectedList.id)} allLists={lists} />
         )}
       </div>
 
@@ -1011,7 +1092,7 @@ export default function LinkList() {
         {/* Right panel */}
         <div className="flex-1 min-w-0">
           {selectedList ? (
-            <LinksPanel list={selectedList} onUnlock={() => handleUnlock(selectedList.id)} />
+            <LinksPanel list={selectedList} onUnlock={() => handleUnlock(selectedList.id)} allLists={lists} />
           ) : (
             <div className="flex flex-col items-center justify-center h-full gap-3 text-center text-muted-foreground">
               <div className="w-14 h-14 rounded-2xl flex items-center justify-center" style={{ background: `${ACCENT}18` }}>
